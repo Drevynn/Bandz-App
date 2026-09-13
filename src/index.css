@@ -1,0 +1,787 @@
+@import "tailwindcss";
+
+/* ==================================================== */
+/* DEFAULT DARK MODE BOOSTS (SCOPED TO PREVENT LEAKING) */
+/* ==================================================== */
+#bandz-shell:not(.light-theme):not(.sepia-theme):not(.cosmic-theme):not(.cyber-theme) .text-slate-100 {
+  color: #f8fafc !important; /* ultra legible white */
+}
+#bandz-shell:not(.light-theme):not(.sepia-theme):not(.cosmic-theme):not(.cyber-theme) .text-slate-200 {
+  color: #f1f5f9 !important; /* light slate gray */
+}
+#bandz-shell:not(.light-theme):not(.sepia-theme):not(.cosmic-theme):not(.cyber-theme) .text-slate-300 {
+  color: #cbd5e1 !important;
+}
+#bandz-shell:not(.light-theme):not(.sepia-theme):not(.cosmic-theme):not(.cyber-theme) .text-slate-400 {
+  color: #94a3b8 !important; /* legible medium gray */
+}
+#bandz-shell:not(.light-theme):not(.sepia-theme):not(.cosmic-theme):not(.cyber-theme) .text-slate-500 {
+  color: #64748b !important; /* legible secondary muted */
+}
+#bandz-shell:not(.light-theme):not(.sepia-theme):not(.cosmic-theme):not(.cyber-theme) .text-slate-600 {
+  color: #475569 !important;
+}
+
+/* ==================================================== */
+/* 1. LIGHT THEME (CLASSIC DAY MODE) - CRISP & READABLE */
+/* ==================================================== */
+.light-theme {
+  background-color: #f8fafc !important; /* clean light slate bg */
+  color: #0f172a !important; /* slate-900 text */
+}
+
+.light-theme .bg-slate-950 {
+  background-color: #f8fafc !important;
+}
+
+.light-theme .bg-slate-900 {
+  background-color: #ffffff !important; /* pure white cards for depth */
+}
+
+.light-theme .bg-slate-900\/40 {
+  background-color: rgba(255, 255, 255, 0.75) !important;
+}
+
+.light-theme .bg-slate-900\/20 {
+  background-color: rgba(241, 245, 249, 0.6) !important;
+}
+
+.light-theme .bg-slate-900\/60 {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.light-theme .bg-slate-950\/80 {
+  background-color: rgba(248, 250, 252, 0.85) !important;
+}
+
+.light-theme .bg-slate-950\/60 {
+  background-color: rgba(248, 250, 252, 0.7) !important;
+}
+
+.light-theme .bg-slate-850 {
+  background-color: #f1f5f9 !important; /* neutral slate-100 */
+}
+
+.light-theme .bg-slate-900\/30 {
+  background-color: rgba(241, 245, 249, 0.8) !important;
+}
+
+.light-theme .bg-slate-950\/50 {
+  background-color: rgba(248, 250, 252, 0.5) !important;
+}
+
+/* Borders in Light Theme */
+.light-theme .border-slate-900 {
+  border-color: #e2e8f0 !important; /* slate-200 */
+}
+
+.light-theme .border-slate-800 {
+  border-color: #cbd5e1 !important; /* slate-300 */
+}
+
+.light-theme .border-slate-850 {
+  border-color: #e2e8f0 !important;
+}
+
+.light-theme .border-slate-800\/60 {
+  border-color: rgba(203, 213, 225, 0.7) !important;
+}
+
+/* Light Theme Text Color Mappings (Crisp Contrast ratios) */
+.light-theme .text-slate-100 {
+  color: #0f172a !important; /* slate-900 - dark title */
+}
+
+.light-theme .text-slate-200 {
+  color: #1e293b !important; /* slate-800 */
+}
+
+.light-theme .text-slate-300 {
+  color: #334155 !important; /* slate-700 */
+}
+
+.light-theme .text-slate-400 {
+  color: #475569 !important; /* slate-600 */
+}
+
+.light-theme .text-slate-500 {
+  color: #576475 !important; /* slate-600 readable gray! */
+}
+
+.light-theme .text-slate-600 {
+  color: #64748b !important; /* slate-500 */
+}
+
+.light-theme .text-slate-700 {
+  color: #94a3b8 !important; /* slate-400 */
+}
+
+/* Inputs, Selects, and Textareas in Light Theme */
+.light-theme input, 
+.light-theme select, 
+.light-theme textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+.light-theme input::placeholder,
+.light-theme textarea::placeholder {
+  color: #64748b !important; /* fully legible */
+}
+
+.light-theme select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+/* Hovers & Special elements */
+.light-theme .hover\:bg-slate-850:hover {
+  background-color: #f1f5f9 !important;
+}
+
+.light-theme .hover\:text-slate-200:hover {
+  color: #0f172a !important;
+}
+
+.light-theme .hover\:bg-slate-900\/40:hover {
+  background-color: rgba(241, 245, 249, 0.9) !important;
+}
+
+.light-theme .fixed.inset-0.bg-slate-950\/85 {
+  background-color: rgba(15, 23, 42, 0.6) !important; /* readable backdrop */
+}
+
+.light-theme .bg-slate-900.border.border-slate-800 {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08) !important;
+}
+
+.light-theme .text-emerald-400 {
+  color: #047857 !important; /* dark emerald */
+}
+
+.light-theme .bg-emerald-500\/10 {
+  background-color: rgba(16, 185, 129, 0.12) !important;
+}
+
+.light-theme .border-emerald-500\/20 {
+  border-color: rgba(16, 185, 129, 0.3) !important;
+}
+
+/* ==================================================== */
+/* 2. SEPIA THEME (WARM EDITORIAL) - LUXE & READABLE   */
+/* ==================================================== */
+.sepia-theme {
+  background-color: #fdfbf7 !important; /* warm ivory paper bg */
+  color: #2e1f1c !important; /* dark espresso text */
+}
+
+.sepia-theme .bg-slate-950 {
+  background-color: #fdfbf7 !important;
+}
+
+.sepia-theme .bg-slate-900 {
+  background-color: #f4ece1 !important; /* luxurious warm cream card bg */
+}
+
+.sepia-theme .bg-slate-900\/40 {
+  background-color: rgba(244, 236, 225, 0.75) !important;
+}
+
+.sepia-theme .bg-slate-900\/20 {
+  background-color: rgba(244, 236, 225, 0.4) !important;
+}
+
+.sepia-theme .bg-slate-900\/60 {
+  background-color: rgba(244, 236, 225, 0.9) !important;
+}
+
+.sepia-theme .bg-slate-950\/80 {
+  background-color: rgba(253, 251, 247, 0.85) !important;
+}
+
+.sepia-theme .bg-slate-950\/60 {
+  background-color: rgba(253, 251, 247, 0.7) !important;
+}
+
+.sepia-theme .bg-slate-850 {
+  background-color: #ebdfc9 !important; /* rich paper gold */
+}
+
+.sepia-theme .bg-slate-900\/30 {
+  background-color: rgba(244, 236, 225, 0.6) !important;
+}
+
+.sepia-theme .bg-slate-950\/50 {
+  background-color: rgba(253, 251, 247, 0.5) !important;
+}
+
+/* Borders in Sepia Theme */
+.sepia-theme .border-slate-900 {
+  border-color: #e6dac6 !important;
+}
+
+.sepia-theme .border-slate-800 {
+  border-color: #d7c9b4 !important;
+}
+
+.sepia-theme .border-slate-850 {
+  border-color: #e6dac6 !important;
+}
+
+.sepia-theme .border-slate-800\/60 {
+  border-color: rgba(215, 201, 180, 0.7) !important;
+}
+
+/* Sepia Theme Text Color Mappings (Warm Chestnut & Espresso) */
+.sepia-theme .text-slate-100 {
+  color: #2e1f1c !important; /* espresso */
+}
+
+.sepia-theme .text-slate-200 {
+  color: #43312f !important; /* dark chestnut */
+}
+
+.sepia-theme .text-slate-300 {
+  color: #5c4744 !important; /* rich cocoa */
+}
+
+.sepia-theme .text-slate-400 {
+  color: #755f5b !important; /* warm brown */
+}
+
+.sepia-theme .text-slate-500 {
+  color: #8c7571 !important; /* soft amber-gray */
+}
+
+.sepia-theme .text-slate-600 {
+  color: #b09c99 !important; /* paper tan */
+}
+
+.sepia-theme .text-slate-700 {
+  color: #cfc2bf !important;
+}
+
+/* Inputs, Selects, and Textareas in Sepia Theme */
+.sepia-theme input, 
+.sepia-theme select, 
+.sepia-theme textarea {
+  background-color: #ffffff !important;
+  color: #2e1f1c !important;
+  border-color: #d7c9b4 !important;
+}
+
+.sepia-theme input::placeholder,
+.sepia-theme textarea::placeholder {
+  color: #8c7571 !important;
+}
+
+.sepia-theme select option {
+  background-color: #ffffff !important;
+  color: #2e1f1c !important;
+}
+
+/* Hovers & Special elements */
+.sepia-theme .hover\:bg-slate-850:hover {
+  background-color: #ebdfc9 !important;
+}
+
+.sepia-theme .hover\:text-slate-200:hover {
+  color: #2e1f1c !important;
+}
+
+.sepia-theme .hover\:bg-slate-900\/40:hover {
+  background-color: rgba(244, 236, 225, 0.9) !important;
+}
+
+.sepia-theme .fixed.inset-0.bg-slate-950\/85 {
+  background-color: rgba(46, 31, 28, 0.65) !important;
+}
+
+.sepia-theme .bg-slate-900.border.border-slate-800 {
+  background-color: #ffffff !important;
+  border-color: #d7c9b4 !important;
+  box-shadow: 0 10px 25px -5px rgba(46, 31, 28, 0.08) !important;
+}
+
+/* ==================================================== */
+/* 3. COSMIC THEME (NEBULA LAVENDER) - VIBRANT STARDUST */
+/* ==================================================== */
+.cosmic-theme {
+  background-color: #060214 !important; /* cosmic void deep dark purple */
+  color: #e9e3ff !important; /* stardust lavender mist */
+}
+
+.cosmic-theme .bg-slate-950 {
+  background-color: #060214 !important;
+}
+
+.cosmic-theme .bg-slate-900 {
+  background-color: #120b29 !important; /* dark velvet card bg */
+}
+
+.cosmic-theme .bg-slate-900\/40 {
+  background-color: rgba(18, 11, 41, 0.7) !important;
+}
+
+.cosmic-theme .bg-slate-900\/20 {
+  background-color: rgba(18, 11, 41, 0.4) !important;
+}
+
+.cosmic-theme .bg-slate-900\/60 {
+  background-color: rgba(18, 11, 41, 0.85) !important;
+}
+
+.cosmic-theme .bg-slate-950\/80 {
+  background-color: rgba(6, 2, 20, 0.85) !important;
+}
+
+.cosmic-theme .bg-slate-950\/60 {
+  background-color: rgba(6, 2, 20, 0.65) !important;
+}
+
+.cosmic-theme .bg-slate-850 {
+  background-color: #1b123d !important; /* deep purple-blue details */
+}
+
+.cosmic-theme .bg-slate-900\/30 {
+  background-color: rgba(18, 11, 41, 0.5) !important;
+}
+
+.cosmic-theme .bg-slate-950\/50 {
+  background-color: rgba(6, 2, 20, 0.5) !important;
+}
+
+/* Borders in Cosmic Theme */
+.cosmic-theme .border-slate-900 {
+  border-color: #24144d !important;
+}
+
+.cosmic-theme .border-slate-800 {
+  border-color: #3b1e7a !important;
+}
+
+.cosmic-theme .border-slate-850 {
+  border-color: #24144d !important;
+}
+
+.cosmic-theme .border-slate-800\/60 {
+  border-color: rgba(59, 30, 122, 0.6) !important;
+}
+
+/* Cosmic Theme Text Mappings (Stardust Lavender glows) */
+.cosmic-theme .text-slate-100 {
+  color: #faf8ff !important; /* celestial white */
+}
+
+.cosmic-theme .text-slate-200 {
+  color: #e9e3ff !important; /* lavender mist */
+}
+
+.cosmic-theme .text-slate-300 {
+  color: #ddd6fe !important; /* light purple */
+}
+
+.cosmic-theme .text-slate-400 {
+  color: #c7d2fe !important; /* stardust violet */
+}
+
+.cosmic-theme .text-slate-500 {
+  color: #a5b4fc !important; /* soft lilac gray */
+}
+
+.cosmic-theme .text-slate-600 {
+  color: #818cf8 !important; /* space indigo text */
+}
+
+.cosmic-theme .text-slate-700 {
+  color: #4f46e5 !important;
+}
+
+/* Inputs, Selects, and Textareas in Cosmic Theme */
+.cosmic-theme input, 
+.cosmic-theme select, 
+.cosmic-theme textarea {
+  background-color: #0b051f !important;
+  color: #faf8ff !important;
+  border-color: #3b1e7a !important;
+}
+
+.cosmic-theme input::placeholder,
+.cosmic-theme textarea::placeholder {
+  color: #a5b4fc !important;
+}
+
+.cosmic-theme select option {
+  background-color: #120b29 !important;
+  color: #faf8ff !important;
+}
+
+/* Hovers & Special elements */
+.cosmic-theme .hover\:bg-slate-850:hover {
+  background-color: #1b123d !important;
+}
+
+.cosmic-theme .hover\:text-slate-200:hover {
+  color: #faf8ff !important;
+}
+
+.cosmic-theme .hover\:bg-slate-900\/40:hover {
+  background-color: rgba(18, 11, 41, 0.8) !important;
+}
+
+.cosmic-theme .fixed.inset-0.bg-slate-950\/85 {
+  background-color: rgba(6, 2, 20, 0.8) !important;
+}
+
+.cosmic-theme .bg-slate-900.border.border-slate-800 {
+  background-color: #120b29 !important;
+  border-color: #3b1e7a !important;
+  box-shadow: 0 10px 30px rgba(139, 92, 246, 0.15) !important;
+}
+
+/* ==================================================== */
+/* 4. CYBER THEME (RETRO CYBER DECK) - HIGHER CONTRAST */
+/* ==================================================== */
+.cyber-theme {
+  background-color: #020306 !important; /* retro terminal background */
+  color: #10b981 !important; /* neon mint */
+}
+
+.cyber-theme .bg-slate-950 {
+  background-color: #020306 !important;
+}
+
+.cyber-theme .bg-slate-900 {
+  background-color: #090d16 !important; /* sleek dark dashboard deck */
+}
+
+.cyber-theme .bg-slate-900\/40 {
+  background-color: rgba(9, 13, 22, 0.7) !important;
+}
+
+.cyber-theme .bg-slate-900\/20 {
+  background-color: rgba(9, 13, 22, 0.4) !important;
+}
+
+.cyber-theme .bg-slate-900\/60 {
+  background-color: rgba(9, 13, 22, 0.85) !important;
+}
+
+.cyber-theme .bg-slate-950\/80 {
+  background-color: rgba(2, 3, 6, 0.85) !important;
+}
+
+.cyber-theme .bg-slate-950\/60 {
+  background-color: rgba(2, 3, 6, 0.65) !important;
+}
+
+.cyber-theme .bg-slate-850 {
+  background-color: #111827 !important;
+}
+
+.cyber-theme .bg-slate-900\/30 {
+  background-color: rgba(9, 13, 22, 0.5) !important;
+}
+
+.cyber-theme .bg-slate-950\/50 {
+  background-color: rgba(2, 3, 6, 0.5) !important;
+}
+
+/* Borders in Cyber Theme */
+.cyber-theme .border-slate-900 {
+  border-color: #064e3b !important; /* forest emerald border */
+}
+
+.cyber-theme .border-slate-800 {
+  border-color: #047857 !important; /* mid terminal emerald border */
+}
+
+.cyber-theme .border-slate-850 {
+  border-color: #064e3b !important;
+}
+
+.cyber-theme .border-slate-800\/60 {
+  border-color: rgba(4, 120, 87, 0.6) !important;
+}
+
+/* Cyber Theme Text Mappings (Luminous Glowing Mint) */
+.cyber-theme .text-slate-100 {
+  color: #34d399 !important; /* terminal active glowing text */
+}
+
+.cyber-theme .text-slate-200 {
+  color: #10b981 !important; /* solid terminal active text */
+}
+
+.cyber-theme .text-slate-300 {
+  color: #059669 !important; /* deep command text */
+}
+
+.cyber-theme .text-slate-400 {
+  color: #047857 !important; /* secondary emerald */
+}
+
+.cyber-theme .text-slate-500 {
+  color: #065f46 !important; /* dark terminal sage */
+}
+
+.cyber-theme .text-slate-600 {
+  color: #064e3b !important;
+}
+
+.cyber-theme .text-slate-700 {
+  color: #022c22 !important;
+}
+
+/* Inputs, Selects, and Textareas in Cyber Theme */
+.cyber-theme input, 
+.cyber-theme select, 
+.cyber-theme textarea {
+  background-color: #010204 !important;
+  color: #34d399 !important;
+  border-color: #047857 !important;
+}
+
+.cyber-theme input::placeholder,
+.cyber-theme textarea::placeholder {
+  color: #065f46 !important;
+}
+
+.cyber-theme select option {
+  background-color: #090d16 !important;
+  color: #34d399 !important;
+}
+
+/* Hovers & Special elements */
+.cyber-theme .hover\:bg-slate-850:hover {
+  background-color: #111827 !important;
+}
+
+.cyber-theme .hover\:text-slate-200:hover {
+  color: #34d399 !important;
+}
+
+.cyber-theme .hover\:bg-slate-900\/40:hover {
+  background-color: rgba(9, 13, 22, 0.8) !important;
+}
+
+.cyber-theme .fixed.inset-0.bg-slate-950\/85 {
+  background-color: rgba(1, 2, 4, 0.85) !important;
+}
+
+.cyber-theme .bg-slate-900.border.border-slate-800 {
+  background-color: #010204 !important;
+  border-color: #047857 !important;
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.15) !important;
+}
+
+/* ==================================================== */
+/* DYNAMIC ACCENT HIGHLIGHTS OVERRIDES                  */
+/* ==================================================== */
+.accent-emerald .text-amber-500 { color: #10b981 !important; }
+.accent-emerald .text-amber-400 { color: #34d399 !important; }
+.accent-emerald .text-amber-600 { color: #059669 !important; }
+.accent-emerald .bg-amber-500 { background-color: #10b981 !important; }
+.accent-emerald .bg-amber-400 { background-color: #34d399 !important; }
+.accent-emerald .hover\:bg-amber-400:hover { background-color: #34d399 !important; }
+.accent-emerald .bg-amber-500\/10 { background-color: rgba(16, 185, 129, 0.1) !important; }
+.accent-emerald .bg-amber-500\/15 { background-color: rgba(16, 185, 129, 0.15) !important; }
+.accent-emerald .bg-amber-500\/20 { background-color: rgba(16, 185, 129, 0.2) !important; }
+.accent-emerald .bg-amber-500\/5 { background-color: rgba(16, 185, 129, 0.05) !important; }
+.accent-emerald .border-amber-500\/20 { border-color: rgba(16, 185, 129, 0.2) !important; }
+.accent-emerald .border-amber-600\/20 { border-color: rgba(5, 150, 105, 0.2) !important; }
+.accent-emerald .shadow-amber-500\/15 { box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.15) !important; }
+.accent-emerald .shadow-amber-500\/5 { box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.05) !important; }
+.accent-emerald .focus\:border-amber-500\/50:focus { border-color: rgba(16, 185, 129, 0.5) !important; }
+.accent-emerald .from-amber-500 { --tw-gradient-from: #10b981 !important; }
+.accent-emerald .to-amber-400 { --tw-gradient-to: #34d399 !important; }
+.accent-emerald .from-amber-600 { --tw-gradient-from: #059669 !important; }
+.accent-emerald .to-amber-500 { --tw-gradient-to: #10b981 !important; }
+.accent-emerald .hover\:from-amber-600:hover { --tw-gradient-from: #059669 !important; }
+.accent-emerald .hover\:to-yellow-600:hover { --tw-gradient-to: #059669 !important; }
+.accent-emerald .hover\:text-amber-500:hover { color: #10b981 !important; }
+.accent-emerald .hover\:text-amber-400:hover { color: #34d399 !important; }
+.accent-emerald .fill-amber-500\/10 { fill: rgba(16, 185, 129, 0.1) !important; }
+
+.accent-indigo .text-amber-500 { color: #6366f1 !important; }
+.accent-indigo .text-amber-400 { color: #818cf8 !important; }
+.accent-indigo .text-amber-600 { color: #4f46e5 !important; }
+.accent-indigo .bg-amber-500 { background-color: #6366f1 !important; }
+.accent-indigo .bg-amber-400 { background-color: #818cf8 !important; }
+.accent-indigo .hover\:bg-amber-400:hover { background-color: #818cf8 !important; }
+.accent-indigo .bg-amber-500\/10 { background-color: rgba(99, 102, 241, 0.1) !important; }
+.accent-indigo .bg-amber-500\/15 { background-color: rgba(99, 102, 241, 0.15) !important; }
+.accent-indigo .bg-amber-500\/20 { background-color: rgba(99, 102, 241, 0.2) !important; }
+.accent-indigo .bg-amber-500\/5 { background-color: rgba(99, 102, 241, 0.05) !important; }
+.accent-indigo .border-amber-500\/20 { border-color: rgba(99, 102, 241, 0.2) !important; }
+.accent-indigo .border-amber-600\/20 { border-color: rgba(79, 70, 229, 0.2) !important; }
+.accent-indigo .shadow-amber-500\/15 { box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.15) !important; }
+.accent-indigo .shadow-amber-500\/5 { box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.05) !important; }
+.accent-indigo .focus\:border-amber-500\/50:focus { border-color: rgba(99, 102, 241, 0.5) !important; }
+.accent-indigo .from-amber-500 { --tw-gradient-from: #6366f1 !important; }
+.accent-indigo .to-amber-400 { --tw-gradient-to: #818cf8 !important; }
+.accent-indigo .from-amber-600 { --tw-gradient-from: #4f46e5 !important; }
+.accent-indigo .to-amber-500 { --tw-gradient-to: #6366f1 !important; }
+.accent-indigo .hover\:from-amber-600:hover { --tw-gradient-from: #4f46e5 !important; }
+.accent-indigo .hover\:to-yellow-600:hover { --tw-gradient-to: #4f46e5 !important; }
+.accent-indigo .hover\:text-amber-500:hover { color: #6366f1 !important; }
+.accent-indigo .hover\:text-amber-400:hover { color: #818cf8 !important; }
+.accent-indigo .fill-amber-500\/10 { fill: rgba(99, 102, 241, 0.1) !important; }
+
+.accent-violet .text-amber-500 { color: #8b5cf6 !important; }
+.accent-violet .text-amber-400 { color: #a78bfa !important; }
+.accent-violet .text-amber-600 { color: #7c3aed !important; }
+.accent-violet .bg-amber-500 { background-color: #8b5cf6 !important; }
+.accent-violet .bg-amber-400 { background-color: #a78bfa !important; }
+.accent-violet .hover\:bg-amber-400:hover { background-color: #a78bfa !important; }
+.accent-violet .bg-amber-500\/10 { background-color: rgba(139, 92, 246, 0.1) !important; }
+.accent-violet .bg-amber-500\/15 { background-color: rgba(139, 92, 246, 0.15) !important; }
+.accent-violet .bg-amber-500\/20 { background-color: rgba(139, 92, 246, 0.2) !important; }
+.accent-violet .bg-amber-500\/5 { background-color: rgba(139, 92, 246, 0.05) !important; }
+.accent-violet .border-amber-500\/20 { border-color: rgba(139, 92, 246, 0.2) !important; }
+.accent-violet .border-amber-600\/20 { border-color: rgba(124, 58, 237, 0.2) !important; }
+.accent-violet .shadow-amber-500\/15 { box-shadow: 0 10px 15px -3px rgba(139, 92, 246, 0.15) !important; }
+.accent-violet .shadow-amber-500\/5 { box-shadow: 0 10px 15px -3px rgba(139, 92, 246, 0.05) !important; }
+.accent-violet .focus\:border-amber-500\/50:focus { border-color: rgba(139, 92, 246, 0.5) !important; }
+.accent-violet .from-amber-500 { --tw-gradient-from: #8b5cf6 !important; }
+.accent-violet .to-amber-400 { --tw-gradient-to: #a78bfa !important; }
+.accent-violet .from-amber-600 { --tw-gradient-from: #7c3aed !important; }
+.accent-violet .to-amber-500 { --tw-gradient-to: #8b5cf6 !important; }
+.accent-violet .hover\:from-amber-600:hover { --tw-gradient-from: #7c3aed !important; }
+.accent-violet .hover\:to-yellow-600:hover { --tw-gradient-to: #7c3aed !important; }
+.accent-violet .hover\:text-amber-500:hover { color: #8b5cf6 !important; }
+.accent-violet .hover\:text-amber-400:hover { color: #a78bfa !important; }
+.accent-violet .fill-amber-500\/10 { fill: rgba(139, 92, 246, 0.1) !important; }
+
+.accent-rose .text-amber-500 { color: #f43f5e !important; }
+.accent-rose .text-amber-400 { color: #fb7185 !important; }
+.accent-rose .text-amber-600 { color: #e11d48 !important; }
+.accent-rose .bg-amber-500 { background-color: #f43f5e !important; }
+.accent-rose .bg-amber-400 { background-color: #fb7185 !important; }
+.accent-rose .hover\:bg-amber-400:hover { background-color: #fb7185 !important; }
+.accent-rose .bg-amber-500\/10 { background-color: rgba(244, 63, 94, 0.1) !important; }
+.accent-rose .bg-amber-500\/15 { background-color: rgba(244, 63, 94, 0.15) !important; }
+.accent-rose .bg-amber-500\/20 { background-color: rgba(244, 63, 94, 0.2) !important; }
+.accent-rose .bg-amber-500\/5 { background-color: rgba(244, 63, 94, 0.05) !important; }
+.accent-rose .border-amber-500\/20 { border-color: rgba(244, 63, 94, 0.2) !important; }
+.accent-rose .border-amber-600\/20 { border-color: rgba(225, 29, 72, 0.2) !important; }
+.accent-rose .shadow-amber-500\/15 { box-shadow: 0 10px 15px -3px rgba(244, 63, 94, 0.15) !important; }
+.accent-rose .shadow-amber-500\/5 { box-shadow: 0 10px 15px -3px rgba(244, 63, 94, 0.05) !important; }
+.accent-rose .focus\:border-amber-500\/50:focus { border-color: rgba(244, 63, 94, 0.5) !important; }
+.accent-rose .from-amber-500 { --tw-gradient-from: #f43f5e !important; }
+.accent-rose .to-amber-400 { --tw-gradient-to: #fb7185 !important; }
+.accent-rose .from-amber-600 { --tw-gradient-from: #e11d48 !important; }
+.accent-rose .to-amber-500 { --tw-gradient-to: #f43f5e !important; }
+.accent-rose .hover\:from-amber-600:hover { --tw-gradient-from: #e11d48 !important; }
+.accent-rose .hover\:to-yellow-600:hover { --tw-gradient-to: #e11d48 !important; }
+.accent-rose .hover\:text-amber-500:hover { color: #f43f5e !important; }
+.accent-rose .hover\:text-amber-400:hover { color: #fb7185 !important; }
+.accent-rose .fill-amber-500\/10 { fill: rgba(244, 63, 94, 0.1) !important; }
+
+/* ==================================================== */
+/* 5. WHITE LAVENDER BACKGROUND + DEEP MAJESTIC PURPLE CARDS + FONT BOOST */
+/* ==================================================== */
+#bandz-shell {
+  background-image: linear-gradient(135deg, #FAF9FF 0%, #F5EFFF 50%, #FAF9FF 100%) !important;
+  background-color: #FAF9FF !important;
+  font-size: 1.085rem !important; /* Increase baseline font size */
+}
+
+/* Precise 2-point font scale up for primary Tailwind typography utility classes */
+#bandz-shell .text-xs { font-size: 0.875rem !important; } /* standard xs is 12px -> 14px */
+#bandz-shell .text-[10px] { font-size: 0.8125rem !important; } /* 10px -> 13px */
+#bandz-shell .text-[9px] { font-size: 0.75rem !important; } /* 9px -> 12px */
+#bandz-shell .text-[11px] { font-size: 0.8125rem !important; }
+#bandz-shell .text-sm { font-size: 1rem !important; } /* standard sm is 14px -> 16px */
+#bandz-shell .text-base { font-size: 1.125rem !important; } /* standard base is 16px -> 18px */
+#bandz-shell .text-lg { font-size: 1.25rem !important; } /* standard lg is 18px -> 20px */
+#bandz-shell .text-xl { font-size: 1.375rem !important; } /* standard xl is 20px -> 22px */
+#bandz-shell .text-2xl { font-size: 1.75rem !important; }
+#bandz-shell .text-3xl { font-size: 2.125rem !important; }
+
+/* Keep card layouts deep majestic purple with stardust and silver typography */
+#bandz-shell .bg-slate-900,
+#bandz-shell .bg-slate-900\/30,
+#bandz-shell .bg-slate-900\/40,
+#bandz-shell .bg-slate-900\/50,
+#bandz-shell .bg-slate-900\/60,
+#bandz-shell .bg-slate-900\/80,
+#bandz-shell .bg-slate-950,
+#bandz-shell .bg-slate-950\/40,
+#bandz-shell .bg-slate-950\/50,
+#bandz-shell .bg-slate-950\/60,
+#bandz-shell .bg-slate-950\/80,
+#bandz-shell .bg-slate-850 {
+  background-color: #12072B !important; /* Deep Majestic Purple */
+  color: #F8FAF7 !important;
+}
+
+/* Ensure subtle borders match with a premium purple-indigo highlight */
+#bandz-shell .border-slate-800,
+#bandz-shell .border-slate-900,
+#bandz-shell .border-slate-850,
+#bandz-shell .border-purple-500\/10,
+#bandz-shell .border-purple-500\/20 {
+  border-color: rgba(167, 139, 250, 0.22) !important;
+}
+
+/* Enforce excellent contrast inside majestic purple cards for light-slate classes */
+#bandz-shell .bg-slate-900 .text-slate-100,
+#bandz-shell .bg-slate-900 .text-slate-200,
+#bandz-shell .bg-slate-900 .text-slate-300,
+#bandz-shell .bg-slate-950 .text-slate-100,
+#bandz-shell .bg-slate-950 .text-slate-200,
+#bandz-shell .bg-slate-950 .text-slate-300,
+#bandz-shell .bg-slate-900\/80 .text-slate-100,
+#bandz-shell .bg-slate-900\/80 .text-slate-200,
+#bandz-shell .bg-slate-900\/80 .text-slate-300,
+#bandz-shell .bg-slate-900\/60 .text-slate-100,
+#bandz-shell .bg-slate-900\/60 .text-slate-200,
+#bandz-shell .bg-slate-900\/60 .text-slate-300,
+#bandz-shell .bg-slate-900\/50 .text-slate-100,
+#bandz-shell .bg-slate-900\/50 .text-slate-200,
+#bandz-shell .bg-slate-900\/50 .text-slate-300,
+#bandz-shell .bg-slate-950\/40 .text-slate-100,
+#bandz-shell .bg-slate-950\/40 .text-slate-200,
+#bandz-shell .bg-slate-950\/40 .text-slate-300 {
+  color: #F8FAF7 !important;
+}
+
+#bandz-shell .bg-slate-900 .text-slate-400,
+#bandz-shell .bg-slate-950 .text-slate-400,
+#bandz-shell .bg-slate-900\/80 .text-slate-400,
+#bandz-shell .bg-slate-900\/60 .text-slate-400,
+#bandz-shell .bg-slate-900\/50 .text-slate-400,
+#bandz-shell .bg-slate-950\/40 .text-slate-400 {
+  color: #CBD5E1 !important; /* light readable silver */
+}
+
+/* Style active inputs, buttons, and select dropdowns inside cards */
+#bandz-shell select,
+#bandz-shell input,
+#bandz-shell textarea {
+  background-color: #1A0E3C !important;
+  color: #FFFFFF !important;
+  border-color: rgba(167, 139, 250, 0.3) !important;
+}
+
+#bandz-shell select option {
+  background-color: #12072B !important;
+  color: #FFFFFF !important;
+}
+
+/* Set the top sticky header bar to deep majestic purple for premium contrast */
+#bandz-shell header {
+  background-color: #0F0524 !important; /* Majestic Royal Header */
+  border-bottom-color: rgba(167, 139, 250, 0.25) !important;
+}
+
+#bandz-shell header h1 span,
+#bandz-shell header select,
+#bandz-shell header .text-white {
+  color: #FFFFFF !important;
+}
+

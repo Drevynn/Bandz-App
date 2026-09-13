@@ -1,0 +1,8 @@
+{
+  "name": "Bandz Platform",
+  "description": "A workspace for local artists to schedule gigs, build setlists, track budgets, and generate promotional copy with AI.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

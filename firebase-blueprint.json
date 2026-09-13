@@ -1,0 +1,94 @@
+{
+  "collections": {
+    "users": {
+      "fields": {
+        "email": "string",
+        "tier": "string",
+        "createdAt": "timestamp",
+        "isPremium": "boolean"
+      }
+    },
+    "artists": {
+      "fields": {
+        "id": "string",
+        "userId": "string",
+        "name": "string",
+        "genre": "string",
+        "origin": "string",
+        "bio": "string",
+        "logoUrl": "string",
+        "members": "array",
+        "instruments": "array",
+        "collaborationStatus": "string"
+      }
+    },
+    "gigs": {
+      "fields": {
+        "id": "string",
+        "userId": "string",
+        "artistId": "string",
+        "title": "string",
+        "venueName": "string",
+        "city": "string",
+        "state": "string",
+        "dateTime": "string",
+        "guarantee": "number",
+        "status": "string",
+        "notes": "string"
+      }
+    },
+    "songs": {
+      "fields": {
+        "id": "string",
+        "userId": "string",
+        "title": "string",
+        "tempo": "number",
+        "key": "string",
+        "duration": "number",
+        "artistId": "string"
+      }
+    },
+    "setlists": {
+      "fields": {
+        "id": "string",
+        "userId": "string",
+        "gigId": "string",
+        "songs": "array"
+      }
+    },
+    "budgets": {
+      "fields": {
+        "id": "string",
+        "userId": "string",
+        "gigId": "string",
+        "description": "string",
+        "amount": "number",
+        "type": "string",
+        "splits": "array"
+      }
+    },
+    "captured_emails": {
+      "fields": {
+        "id": "string",
+        "userId": "string",
+        "email": "string",
+        "artistName": "string",
+        "source": "string",
+        "capturedAt": "string",
+        "subscribed": "boolean",
+        "status": "string",
+        "lastFollowUpAt": "string"
+      }
+    },
+    "campaigns": {
+      "fields": {
+        "id": "string",
+        "userId": "string",
+        "subject": "string",
+        "body": "string",
+        "sentAt": "string",
+        "recipientsCount": "number"
+      }
+    }
+  }
+}
