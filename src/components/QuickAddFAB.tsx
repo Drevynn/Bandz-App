@@ -9,9 +9,16 @@ import {
   ChevronRight, 
   TrendingUp, 
   TrendingDown,
-  Sparkles
+  Sparkles,
+  Disc,
+  Mic2,
+  Users,
+  Video,
+  Target,
+  Wrench,
+  Bot
 } from 'lucide-react';
-import { Artist, Gig, Song, BudgetItem, BudgetItemCategory, BudgetItemType } from '../types';
+import { Artist, Gig, Song, BudgetItem, BudgetItemCategory, BudgetItemType, EventType } from '../types';
 
 interface QuickAddFABProps {
   artists: Artist[];
@@ -20,6 +27,7 @@ interface QuickAddFABProps {
   onAddSong: (song: Song) => void;
   onAddBudgetItem: (item: BudgetItem) => void;
   onNavigateToTab: (tabId: string) => void;
+  onOpenSharon?: () => void;
 }
 
 export default function QuickAddFAB({ 
@@ -28,12 +36,14 @@ export default function QuickAddFAB({
   onAddGig, 
   onAddSong, 
   onAddBudgetItem,
-  onNavigateToTab
+  onNavigateToTab,
+  onOpenSharon
 }: QuickAddFABProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeModal, setActiveModal] = useState<'gig' | 'song' | 'budget' | null>(null);
 
-  // Gig Form State
+  // Gig / Event Form State
+  const [gigEventType, setGigEventType] = useState<EventType>('gig');
   const [gigTitle, setGigTitle] = useState('');
   const [gigArtistId, setGigArtistId] = useState(artists[0]?.id || '');
   const [gigVenue, setGigVenue] = useState('');
@@ -43,6 +53,26 @@ export default function QuickAddFAB({
   const [gigPrice, setGigPrice] = useState('15');
   const [gigUrl, setGigUrl] = useState('');
   const [gigDesc, setGigDesc] = useState('');
+
+  // Rehearsal-specific states
+  const [rehearsalRoom, setRehearsalRoom] = useState('');
+  const [rehearsalSongs, setRehearsalSongs] = useState('');
+  const [rehearsalGear, setRehearsalGear] = useState('');
+  const [rehearsalObjectives, setRehearsalObjectives] = useState('');
+
+  // Recording-specific states
+  const [recordingStudio, setRecordingStudio] = useState('');
+  const [recordingEngineer, setRecordingEngineer] = useState('');
+  const [recordingTracks, setRecordingTracks] = useState('');
+  const [recordingRate, setRecordingRate] = useState('75');
+  const [recordingGoal, setRecordingGoal] = useState('');
+
+  // Meeting-specific states
+  const [meetingType, setMeetingType] = useState<'in_person' | 'video_call'>('video_call');
+  const [meetingLink, setMeetingLink] = useState('');
+  const [meetingAgenda, setMeetingAgenda] = useState('');
+  const [meetingActionItems, setMeetingActionItems] = useState('');
+  const [meetingDecisions, setMeetingDecisions] = useState('');
 
   // Song Form State
   const [songTitle, setSongTitle] = useState('');
@@ -62,18 +92,33 @@ export default function QuickAddFAB({
 
   const handleGigSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!gigTitle || !gigVenue || !gigDateTime) return;
+    if (!gigTitle || !gigDateTime) return;
+
+    let computedVenueName = gigVenue;
+    let computedVenueAddress = gigAddress;
+
+    if (gigEventType === 'rehearsal') {
+      computedVenueName = rehearsalRoom || gigVenue || 'Band Rehearsal Space';
+      if (!computedVenueAddress) computedVenueAddress = 'Local rehearsal studio';
+    } else if (gigEventType === 'recording') {
+      computedVenueName = recordingStudio || gigVenue || 'Sound Lab Studios';
+      if (!computedVenueAddress) computedVenueAddress = 'Commercial recording studio';
+    } else if (gigEventType === 'meeting') {
+      computedVenueName = meetingType === 'video_call' ? 'Online Video Call' : (gigVenue || 'Band Headquarters');
+      if (meetingType === 'video_call' && !computedVenueAddress) computedVenueAddress = 'Remote / Video Conference';
+    }
 
     const newGig: Gig = {
-      id: `gig-${Date.now()}`,
+      id: `event-${Date.now()}`,
       title: gigTitle,
+      eventType: gigEventType,
       artistId: gigArtistId,
-      venueName: gigVenue,
-      venueAddress: gigAddress,
+      venueName: computedVenueName || 'TBA',
+      venueAddress: computedVenueAddress || '',
       dateTime: gigDateTime,
       durationMinutes: Number(gigDuration) || 60,
-      ticketPrice: Number(gigPrice) || 0,
-      ticketUrl: gigUrl || undefined,
+      ticketPrice: gigEventType === 'gig' ? (Number(gigPrice) || 0) : 0,
+      ticketUrl: gigEventType === 'gig' ? (gigUrl || undefined) : undefined,
       description: gigDesc,
       status: 'confirmed',
       notes: '',
@@ -83,7 +128,27 @@ export default function QuickAddFAB({
         flyerDistributed: false,
         outreachCompleted: false,
         ticketsLive: false,
-      }
+      },
+      rehearsalDetails: gigEventType === 'rehearsal' ? {
+        roomStudio: rehearsalRoom || gigVenue,
+        focusSongs: rehearsalSongs.split(',').map(s => s.trim()).filter(Boolean),
+        equipmentToBring: rehearsalGear.split(',').map(s => s.trim()).filter(Boolean),
+        objectives: rehearsalObjectives
+      } : undefined,
+      recordingDetails: gigEventType === 'recording' ? {
+        studioName: recordingStudio || gigVenue,
+        engineerName: recordingEngineer,
+        tracksToRecord: recordingTracks.split(',').map(s => s.trim()).filter(Boolean),
+        hourlyRate: Number(recordingRate) || 75,
+        sessionGoal: recordingGoal
+      } : undefined,
+      meetingDetails: gigEventType === 'meeting' ? {
+        locationType: meetingType,
+        meetingLink: meetingLink || undefined,
+        agendaItems: meetingAgenda.split('\n').map(s => s.trim()).filter(Boolean),
+        actionItems: meetingActionItems.split('\n').map(s => s.trim()).filter(Boolean),
+        decisions: meetingDecisions || undefined
+      } : undefined
     };
 
     onAddGig(newGig);
@@ -97,6 +162,19 @@ export default function QuickAddFAB({
     setGigAddress('');
     setGigDateTime('');
     setGigDesc('');
+    setRehearsalRoom('');
+    setRehearsalSongs('');
+    setRehearsalGear('');
+    setRehearsalObjectives('');
+    setRecordingStudio('');
+    setRecordingEngineer('');
+    setRecordingTracks('');
+    setRecordingGoal('');
+    setMeetingLink('');
+    setMeetingAgenda('');
+    setMeetingActionItems('');
+    setMeetingDecisions('');
+    setGigEventType('gig');
   };
 
   const handleSongSubmit = (e: React.FormEvent) => {
@@ -185,19 +263,47 @@ export default function QuickAddFAB({
                 </span>
               </div>
 
-              {/* Action 1: Add Gig */}
+              {/* Action 0: Ask Sharon AI Manager */}
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  if (onOpenSharon) {
+                    onOpenSharon();
+                  } else {
+                    onNavigateToTab('promo');
+                  }
+                }}
+                className="w-full flex items-center justify-between p-2 text-xs text-purple-200 hover:text-white bg-purple-950/40 hover:bg-purple-900/60 border border-purple-500/30 rounded-xl transition-all font-semibold cursor-pointer mb-1 shadow-inner"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-sm shadow-purple-500/30">
+                    <Bot size={16} />
+                  </div>
+                  <div className="text-left">
+                    <div className="text-[11px] font-bold text-white flex items-center gap-1">
+                      <span>Sharon AI Voice</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    </div>
+                    <div className="text-[9.5px] text-purple-300 font-mono">Speak or type requests</div>
+                  </div>
+                </div>
+                <ChevronRight size={14} className="opacity-60 text-purple-300" />
+              </button>
+
+              {/* Action 1: Add Event */}
               <button
                 onClick={() => {
                   setGigArtistId(artists[0]?.id || '');
+                  setGigEventType('gig');
                   setActiveModal('gig');
                 }}
                 className="w-full flex items-center justify-between p-2.5 text-xs text-slate-200 hover:text-amber-400 hover:bg-slate-850 rounded-xl transition-all font-medium cursor-pointer"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-500">
+                  <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400">
                     <Calendar size={15} />
                   </div>
-                  <span>Log New Gig</span>
+                  <span>Schedule Event (Gig / Rehearsal / Sync)</span>
                 </div>
                 <ChevronRight size={14} className="opacity-40" />
               </button>
@@ -259,7 +365,7 @@ export default function QuickAddFAB({
       </div>
 
       {/* ---------------------------------------------------- */}
-      {/* GIG CREATION MODAL */}
+      {/* EVENT CREATION MODAL (GIG, REHEARSAL, RECORDING, MEETING) */}
       {/* ---------------------------------------------------- */}
       <AnimatePresence>
         {activeModal === 'gig' && (
@@ -278,24 +384,62 @@ export default function QuickAddFAB({
               </button>
 
               <div className="flex items-center gap-2 mb-1">
-                <Calendar className="text-amber-500" size={18} />
-                <h3 className="text-base font-bold font-display text-slate-100">Log Scheduled Gig Event</h3>
+                <Calendar className="text-purple-400" size={18} />
+                <h3 className="text-base font-bold font-display text-slate-100">Schedule Event</h3>
               </div>
-              <p className="text-xs text-slate-400 mb-5">
-                Register a new calendar schedule. This auto-activates pricing trackers and prompt generators.
+              <p className="text-xs text-slate-400 mb-4">
+                Register a concert gig, rehearsal session, studio lockout, or band meeting on the master calendar.
               </p>
+
+              {/* Event Type Tabs */}
+              <div className="grid grid-cols-4 gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 mb-5">
+                {[
+                  { id: 'gig', label: 'Gig', icon: Calendar, color: 'text-purple-400', activeBg: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
+                  { id: 'rehearsal', label: 'Rehearsal', icon: Disc, color: 'text-emerald-400', activeBg: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' },
+                  { id: 'recording', label: 'Studio', icon: Mic2, color: 'text-amber-400', activeBg: 'bg-amber-500/20 text-amber-300 border-amber-500/30' },
+                  { id: 'meeting', label: 'Meeting', icon: Users, color: 'text-sky-400', activeBg: 'bg-sky-500/20 text-sky-300 border-sky-500/30' },
+                ].map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = gigEventType === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setGigEventType(tab.id as EventType)}
+                      className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+                        isActive
+                          ? `${tab.activeBg} shadow-sm`
+                          : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                      }`}
+                    >
+                      <Icon size={13} className={isActive ? '' : tab.color} />
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
 
               <form onSubmit={handleGigSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="sm:col-span-2">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Gig Title *</label>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      {gigEventType === 'gig' ? 'Gig Title *' :
+                       gigEventType === 'rehearsal' ? 'Rehearsal Title *' :
+                       gigEventType === 'recording' ? 'Tracking Session Title *' :
+                       'Meeting Title *'}
+                    </label>
                     <input
                       type="text"
                       required
-                      placeholder="e.g., Summer Brewfest, Electric Lounge Concert"
+                      placeholder={
+                        gigEventType === 'gig' ? 'e.g., Summer Brewfest, Electric Lounge Concert' :
+                        gigEventType === 'rehearsal' ? 'e.g., Tour Setlist Polish & Harmony Practice' :
+                        gigEventType === 'recording' ? 'e.g., Drum Tracking & Bass Overdubs - EP Track 1' :
+                        'e.g., Q3 Tour Routing & Budget Planning Sync'
+                      }
                       value={gigTitle}
                       onChange={(e) => setGigTitle(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500/50"
+                      className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500/50"
                     />
                   </div>
 
@@ -304,35 +448,12 @@ export default function QuickAddFAB({
                     <select
                       value={gigArtistId}
                       onChange={(e) => setGigArtistId(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500/50"
+                      className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500/50"
                     >
                       {artists.map(a => (
                         <option key={a.id} value={a.id}>{a.name}</option>
                       ))}
                     </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Venue Name *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g., Century Ballroom"
-                      value={gigVenue}
-                      onChange={(e) => setGigVenue(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500/50"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Venue Address</label>
-                    <input
-                      type="text"
-                      placeholder="e.g., 915 E Pine St, Seattle, WA"
-                      value={gigAddress}
-                      onChange={(e) => setGigAddress(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500/50"
-                    />
                   </div>
 
                   <div>
@@ -342,7 +463,7 @@ export default function QuickAddFAB({
                       required
                       value={gigDateTime}
                       onChange={(e) => setGigDateTime(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500/50"
+                      className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500/50"
                     />
                   </div>
 
@@ -354,40 +475,226 @@ export default function QuickAddFAB({
                         min="1"
                         value={gigDuration}
                         onChange={(e) => setGigDuration(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500/50"
+                        className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500/50"
                       />
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Ticket Price ($)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={gigPrice}
-                        onChange={(e) => setGigPrice(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500/50"
-                      />
-                    </div>
+                    {gigEventType === 'gig' ? (
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Ticket Price ($)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={gigPrice}
+                          onChange={(e) => setGigPrice(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500/50"
+                        />
+                      </div>
+                    ) : gigEventType === 'recording' ? (
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Studio Rate ($/hr)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={recordingRate}
+                          onChange={(e) => setRecordingRate(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500/50"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex flex-col justify-end">
+                        <span className="text-[11px] text-slate-500 pb-2">Internal session</span>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="sm:col-span-2">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Ticket URL (Optional)</label>
-                    <input
-                      type="url"
-                      placeholder="https://gigs.com/tickets/101"
-                      value={gigUrl}
-                      onChange={(e) => setGigUrl(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500/50"
-                    />
-                  </div>
+                  {/* Gig Specific Fields */}
+                  {gigEventType === 'gig' && (
+                    <>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Venue Name *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g., Century Ballroom"
+                          value={gigVenue}
+                          onChange={(e) => setGigVenue(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500/50"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Venue Address</label>
+                        <input
+                          type="text"
+                          placeholder="e.g., 915 E Pine St, Seattle, WA"
+                          value={gigAddress}
+                          onChange={(e) => setGigAddress(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500/50"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Ticket URL (Optional)</label>
+                        <input
+                          type="url"
+                          placeholder="https://gigs.com/tickets/101"
+                          value={gigUrl}
+                          onChange={(e) => setGigUrl(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500/50"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Rehearsal Specific Fields */}
+                  {gigEventType === 'rehearsal' && (
+                    <>
+                      <div>
+                        <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">Room / Studio Name</label>
+                        <input
+                          type="text"
+                          placeholder="e.g., Studio C, Lockout Room 4"
+                          value={rehearsalRoom}
+                          onChange={(e) => setRehearsalRoom(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/50"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">Focus Songs (comma-separated)</label>
+                        <input
+                          type="text"
+                          placeholder="e.g., Midnight Drive, Electric Horizon"
+                          value={rehearsalSongs}
+                          onChange={(e) => setRehearsalSongs(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/50"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">Special Gear to Bring (comma-separated)</label>
+                        <input
+                          type="text"
+                          placeholder="e.g., Backup snare, In-ear monitors, Wireless pack"
+                          value={rehearsalGear}
+                          onChange={(e) => setRehearsalGear(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/50"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">Rehearsal Objectives</label>
+                        <input
+                          type="text"
+                          placeholder="e.g., Lock tempo changes in songs 3 and 4, polish 3-part vocal harmonies"
+                          value={rehearsalObjectives}
+                          onChange={(e) => setRehearsalObjectives(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/50"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Recording Specific Fields */}
+                  {gigEventType === 'recording' && (
+                    <>
+                      <div>
+                        <label className="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">Studio Name</label>
+                        <input
+                          type="text"
+                          placeholder="e.g., Sound Lab Studios, Studio Sunset"
+                          value={recordingStudio}
+                          onChange={(e) => setRecordingStudio(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500/50"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">Engineer / Producer</label>
+                        <input
+                          type="text"
+                          placeholder="e.g., Dave Pensado, Sarah Jenkins"
+                          value={recordingEngineer}
+                          onChange={(e) => setRecordingEngineer(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500/50"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">Tracks to Record (comma-separated)</label>
+                        <input
+                          type="text"
+                          placeholder="e.g., Midnight Horizon, City of Neon, Track 3 Acoustic"
+                          value={recordingTracks}
+                          onChange={(e) => setRecordingTracks(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500/50"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">Session Goal / Milestone</label>
+                        <input
+                          type="text"
+                          placeholder="e.g., Complete final drum takes and guitar overdubs"
+                          value={recordingGoal}
+                          onChange={(e) => setRecordingGoal(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500/50"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Meeting Specific Fields */}
+                  {gigEventType === 'meeting' && (
+                    <>
+                      <div>
+                        <label className="block text-[10px] font-bold text-sky-400 uppercase tracking-wider mb-1">Meeting Format</label>
+                        <select
+                          value={meetingType}
+                          onChange={(e) => setMeetingType(e.target.value as 'in_person' | 'video_call')}
+                          className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500/50 font-semibold"
+                        >
+                          <option value="video_call">Online Video Call (Zoom / Meet)</option>
+                          <option value="in_person">In-Person Meeting</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-sky-400 uppercase tracking-wider mb-1">
+                          {meetingType === 'video_call' ? 'Video Meeting Link' : 'Meeting Location / Address'}
+                        </label>
+                        <input
+                          type="text"
+                          placeholder={meetingType === 'video_call' ? 'https://meet.google.com/abc-def-ghi' : 'e.g., Band rehearsal space lounge'}
+                          value={meetingLink}
+                          onChange={(e) => setMeetingLink(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500/50"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="block text-[10px] font-bold text-sky-400 uppercase tracking-wider mb-1">Agenda Items (One topic per line)</label>
+                        <textarea
+                          placeholder="1. Review fall tour routing&#10;2. Approve merchandise budget&#10;3. Select single release artwork"
+                          value={meetingAgenda}
+                          onChange={(e) => setMeetingAgenda(e.target.value)}
+                          rows={2}
+                          className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500/50 resize-none"
+                        />
+                      </div>
+                    </>
+                  )}
 
                   <div className="sm:col-span-2">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Short Description</label>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      Internal Notes / Details
+                    </label>
                     <textarea
-                      placeholder="Add simple promotional notes, dress code parameters, or lineup schedules..."
+                      placeholder="Add simple promotional notes, load-in details, dress code parameters, or lineup schedules..."
                       value={gigDesc}
                       onChange={(e) => setGigDesc(e.target.value)}
                       rows={2}
-                      className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500/50 resize-none"
+                      className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500/50 resize-none"
                     />
                   </div>
                 </div>
@@ -402,7 +709,7 @@ export default function QuickAddFAB({
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded text-xs font-bold cursor-pointer transition-colors"
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-bold cursor-pointer transition-colors shadow-lg shadow-purple-600/20"
                   >
                     Confirm & Schedule
                   </button>

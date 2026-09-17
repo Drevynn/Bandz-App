@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Artist, Gig, Song, Setlist, BudgetItem, Venue, GigOpportunity, GigApplication, Message, FanProfile, FanNotification } from './types';
+import { Artist, Gig, Song, Setlist, BudgetItem, Venue, GigOpportunity, GigApplication, Message, FanProfile, FanNotification, CollaborationRequest, CollaborationResponse } from './types';
 import {
   INITIAL_ARTISTS,
   INITIAL_GIGS,
@@ -11,7 +11,8 @@ import {
   INITIAL_APPLICATIONS,
   INITIAL_MESSAGES,
   INITIAL_FAN_PROFILES,
-  INITIAL_FAN_NOTIFICATIONS
+  INITIAL_FAN_NOTIFICATIONS,
+  INITIAL_COLLABORATION_REQUESTS
 } from './data';
 
 // Modular Component Tabs
@@ -33,6 +34,8 @@ import LandingPage from './components/LandingPage';
 import PaywallLogin from './components/PaywallLogin';
 import TourMap from './components/TourMap';
 import AdminTab from './components/AdminTab';
+import LegalDocsModal, { LegalDocType } from './components/LegalDocsModal';
+import SharonAssistant from './components/SharonAssistant';
 
 // Lucide Icons
 import {
@@ -65,7 +68,11 @@ import {
   Building2,
   Briefcase,
   Heart,
-  Bell
+  Bell,
+  Bot,
+  Mic,
+  LifeBuoy,
+  Phone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, db } from './lib/firebase';
@@ -159,9 +166,9 @@ const TAB_HEADER_CONFIG: Record<TabId, {
     image: '/src/assets/images/concert_stage_header_1788820340861.jpg'
   },
   help: {
-    badge: 'DOCUMENTATION & OPERATOR GUIDE',
-    title: 'Field Manual & Knowledge Base',
-    desc: 'Everything you need to master setlist timing, CSV reporting, Google AI venue queries, and multi-band coordination.',
+    badge: 'SUPPORT, HOW-TO & WIKI FIELD MANUAL',
+    title: 'Support Center, How-To & Knowledge Wiki',
+    desc: 'Comprehensive step-by-step guides, complete operational wiki encyclopedia, and direct support hotline at (951) 594-5105 & support@alistwebs.com.',
     image: '/src/assets/images/venue_backstage_header_1788820358944.jpg'
   }
 };
@@ -189,8 +196,43 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [fanProfiles, setFanProfiles] = useState<FanProfile[]>([]);
   const [fanNotifications, setFanNotifications] = useState<FanNotification[]>([]);
+  const [collaborationRequests, setCollaborationRequests] = useState<CollaborationRequest[]>([]);
   const [prefillVenue, setPrefillVenue] = useState<Venue | null>(null);
   const hasSyncedRef = useRef(false);
+
+  const saveCollaborationRequests = (updated: CollaborationRequest[]) => {
+    setCollaborationRequests(updated);
+    localStorage.setItem('bandz_collaboration_requests', JSON.stringify(updated));
+  };
+  const handleAddCollaborationRequest = (req: CollaborationRequest) => {
+    saveCollaborationRequests([req, ...collaborationRequests]);
+  };
+  const handleUpdateCollaborationRequest = (req: CollaborationRequest) => {
+    saveCollaborationRequests(collaborationRequests.map(r => r.id === req.id ? req : r));
+  };
+  const handleDeleteCollaborationRequest = (id: string) => {
+    saveCollaborationRequests(collaborationRequests.filter(r => r.id !== id));
+  };
+  const handleAddCollaborationResponse = (requestId: string, response: CollaborationResponse) => {
+    const target = collaborationRequests.find(r => r.id === requestId);
+    if (!target) return;
+    const updated = {
+      ...target,
+      responses: [...(target.responses || []), response]
+    };
+    handleUpdateCollaborationRequest(updated);
+  };
+  const handleUpdateCollaborationResponseStatus = (requestId: string, responseId: string, status: 'pending' | 'accepted' | 'declined' | 'shortlisted') => {
+    const target = collaborationRequests.find(r => r.id === requestId);
+    if (!target) return;
+    const updatedResponses = (target.responses || []).map(r => r.id === responseId ? { ...r, status } : r);
+    const updated = {
+      ...target,
+      status: status === 'accepted' ? 'in_discussion' : target.status,
+      responses: updatedResponses
+    };
+    handleUpdateCollaborationRequest(updated as CollaborationRequest);
+  };
 
   const saveVenues = (updated: Venue[]) => {
     setVenues(updated);
@@ -281,13 +323,15 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [isDbLoaded, setIsDbLoaded] = useState<boolean>(false);
   const [themeSelectorOpen, setThemeSelectorOpen] = useState<boolean>(false);
+  const [legalModal, setLegalModal] = useState<LegalDocType | null>(null);
+  const [showSharonModal, setShowSharonModal] = useState<boolean>(false);
 
   // Paywall & Session Navigation State
   const [sessionView, setSessionView] = useState<'landing' | 'app' | 'paywall_login'>('landing');
   const [selectedSignupTier, setSelectedSignupTier] = useState<string>('pro');
   const [userSession, setUserSession] = useState<{ email: string; tier: string; isPremium: boolean } | null>(null);
 
-  // Trial & AI Credit Guard States
+  // Trial & AI Credit Guard States (14-Day Free Trial applies across all 3 tiers)
   const [trialStartDate, setTrialStartDate] = useState<string | null>(() => {
     return localStorage.getItem('bandz_trial_start_date');
   });
@@ -298,7 +342,7 @@ export default function App() {
     if (tier === 'arena') return 500;
     if (tier === 'pro') return 150;
     if (tier === 'weekly') return 50;
-    return 15; // 3-month free trial
+    return 150; // 14-day free trial on Pro features
   };
 
   // Sync / Load credits dynamically based on session
@@ -313,15 +357,13 @@ export default function App() {
         localStorage.setItem(`bandz_credits_${userSession.tier}_${userSession.email}`, max.toString());
       }
 
-      // Initialize trial start date if on the 3-month free trial
-      if (userSession.tier === 'garage') {
-        let startDate = localStorage.getItem('bandz_trial_start_date');
-        if (!startDate) {
-          startDate = new Date().toISOString();
-          localStorage.setItem('bandz_trial_start_date', startDate);
-        }
-        setTrialStartDate(startDate);
+      // Initialize 14-day trial start date for user session
+      let startDate = localStorage.getItem('bandz_trial_start_date');
+      if (!startDate) {
+        startDate = new Date().toISOString();
+        localStorage.setItem('bandz_trial_start_date', startDate);
       }
+      setTrialStartDate(startDate);
     }
   }, [userSession]);
 
@@ -335,16 +377,16 @@ export default function App() {
   };
 
   const getTrialDaysRemaining = () => {
-    if (!trialStartDate) return 90;
+    if (!trialStartDate) return 14;
     const start = new Date(trialStartDate).getTime();
-    const ninetyDaysMs = 90 * 24 * 60 * 60 * 1000;
-    const expiry = start + ninetyDaysMs;
+    const fourteenDaysMs = 14 * 24 * 60 * 60 * 1000;
+    const expiry = start + fourteenDaysMs;
     const diff = expiry - Date.now();
     return Math.max(0, Math.ceil(diff / (24 * 60 * 60 * 1000)));
   };
 
   const daysRemaining = getTrialDaysRemaining();
-  const isTrialExpired = userSession?.tier === 'garage' && daysRemaining <= 0;
+  const isTrialExpired = Boolean(localStorage.getItem('bandz_simulated_expired') === 'true');
 
   // Theme & Accent Color State
   const [theme, setTheme] = useState<'light' | 'dark' | 'sepia' | 'cyber' | 'cosmic'>(() => {
@@ -442,6 +484,14 @@ export default function App() {
       else {
         setFanNotifications(INITIAL_FAN_NOTIFICATIONS);
         localStorage.setItem('bandz_fan_notifications', JSON.stringify(INITIAL_FAN_NOTIFICATIONS));
+      }
+
+      const storedCollabs = localStorage.getItem('bandz_collaboration_requests');
+      if (storedCollabs) {
+        setCollaborationRequests(JSON.parse(storedCollabs));
+      } else {
+        setCollaborationRequests(INITIAL_COLLABORATION_REQUESTS);
+        localStorage.setItem('bandz_collaboration_requests', JSON.stringify(INITIAL_COLLABORATION_REQUESTS));
       }
 
       // Default selected artist to first one available, or 'all'
@@ -910,8 +960,8 @@ export default function App() {
         onEnterDemo={(email, artistName) => {
           setUserSession({ 
             email: email || 'sandbox_guest@bandz.io', 
-            tier: 'garage', 
-            isPremium: false 
+            tier: 'pro', 
+            isPremium: true 
           });
 
           // Log captured email to central database
@@ -1027,7 +1077,7 @@ export default function App() {
               ⚠️ CONSOLE PASS EXPIRED
             </span>
             <h2 className="text-2xl font-black text-white uppercase tracking-tight font-display">
-              Your 3-Month Trial Has Ended
+              Your 14-Day Trial Has Ended
             </h2>
             <p className="text-xs text-slate-400 leading-relaxed max-w-md mx-auto">
               To keep your scheduled gigs, cost ledgers, band profiles, and campaign assets safe and active, upgrade your administrator node subscription.
@@ -1098,33 +1148,32 @@ export default function App() {
         backgroundPosition: 'center'
       }}
     >
-      {/* 0. Demo Mode Upgrade Banner */}
-      {userSession?.tier === 'garage' && (
-        <div className="bg-gradient-to-r from-[#9D4EDD] via-[#7B2CBF] to-[#5A189A] text-white py-2.5 px-4 text-center text-[10px] md:text-xs font-bold font-mono tracking-wide flex flex-col md:flex-row items-center justify-center gap-2 md:gap-3 shadow-lg shadow-black/15 z-40 backdrop-blur-md border-b border-purple-500/25">
+      {/* 0. 14-Day Free Trial Mode Banner */}
+      {userSession && daysRemaining > 0 && (
+        <div className="bg-gradient-to-r from-[#9D4EDD] via-[#7B2CBF] to-[#5A189A] text-white py-2 px-4 text-center text-[10px] md:text-xs font-bold font-mono tracking-wide flex flex-col md:flex-row items-center justify-center gap-2 md:gap-3 shadow-lg shadow-black/15 z-40 backdrop-blur-md border-b border-purple-500/25">
           <span className="flex items-center gap-1.5 justify-center">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-            🎁 3-MONTH FREE TRIAL ACTIVE • {daysRemaining} Days Remaining (90-Day Pass)
+            🎁 14-DAY FREE TRIAL ACTIVE ({(userSession?.tier || 'pro').toUpperCase()} PLAN) • {daysRemaining} Days Remaining
           </span>
           <div className="flex items-center gap-2.5">
             <button 
               onClick={() => {
-                const simulatedPastDate = new Date(Date.now() - 91 * 24 * 60 * 60 * 1000).toISOString();
-                localStorage.setItem('bandz_trial_start_date', simulatedPastDate);
-                setTrialStartDate(simulatedPastDate);
+                localStorage.setItem('bandz_simulated_expired', 'true');
+                window.location.reload();
               }}
               className="bg-slate-950/80 hover:bg-slate-950 border border-slate-800 text-slate-300 px-3 py-1 rounded-lg transition-all font-mono font-bold text-[8px] md:text-[9.5px] shrink-0"
-              title="Simulate 91 days passing to test trial expiration"
+              title="Simulate 15 days passing to test trial expiration"
             >
-              Simulate 90-Day Expiry ⏱️
+              Simulate 14-Day Expiry ⏱️
             </button>
             <button 
               onClick={() => {
-                setSelectedSignupTier('pro');
+                setSelectedSignupTier(userSession?.tier || 'pro');
                 setSessionView('paywall_login');
               }}
               className="bg-amber-500 hover:bg-amber-400 text-slate-950 px-3.5 py-1 rounded-full transition-all font-sans font-bold text-[9px] md:text-xs shrink-0 shadow-md cursor-pointer animate-pulse border-none"
             >
-              Upgrade Plan &rarr;
+              Manage Plan &rarr;
             </button>
           </div>
         </div>
@@ -1182,12 +1231,33 @@ export default function App() {
             </select>
           </div>
 
+          {/* Sharon AI Voice Manager Trigger */}
+          <button
+            onClick={() => setShowSharonModal(true)}
+            className="px-3 py-1.5 bg-gradient-to-r from-purple-600 via-indigo-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white border border-purple-400/40 rounded-xl text-[10px] font-bold font-mono transition-all cursor-pointer flex items-center gap-1.5 shadow-md shadow-purple-900/30"
+            title="Speak or Type to Sharon AI Manager"
+          >
+            <Bot size={13} className="text-purple-200" />
+            <span>Sharon AI Voice</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          </button>
+
           {/* Back to Landing Page Button */}
           <button
             onClick={() => setSessionView('landing')}
             className="px-3 py-1.5 bg-purple-950 hover:bg-purple-900 border border-purple-800/40 rounded-xl text-[10px] font-bold font-mono text-purple-300 hover:text-white transition-all cursor-pointer"
           >
             LANDING_PAGE
+          </button>
+
+          {/* Privacy & Terms Quick Modal Button */}
+          <button
+            onClick={() => setLegalModal('privacy')}
+            className="px-2.5 py-1.5 bg-slate-900/60 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-[10px] font-bold font-mono text-slate-300 hover:text-white transition-all cursor-pointer flex items-center gap-1.5"
+            title="Google-Verified Privacy Policy & Terms of Service"
+          >
+            <ShieldCheck size={12} className="text-emerald-400" />
+            <span>PRIVACY & TOS</span>
           </button>
 
           {userSession && (
@@ -1260,7 +1330,7 @@ export default function App() {
                 { id: 'linktree', label: 'Link Tree', icon: Link },
                 { id: 'admin', label: 'Site Admin', icon: ShieldCheck },
                 { id: 'about', label: 'About', icon: Info },
-                { id: 'help', label: 'Help', icon: HelpCircle },
+                { id: 'help', label: 'Support & Wiki', icon: LifeBuoy },
               ].map((tab) => {
                 const Icon = tab.icon;
                 const isSelected = activeTab === tab.id;
@@ -1295,7 +1365,7 @@ export default function App() {
               })}
             </div>
 
-            {/* Mobile Cloud Sync Info */}
+            {/* Mobile Cloud Sync Info & Navigation */}
             <div className="pt-3 border-t border-slate-900/80 space-y-2">
               <div className="flex items-center justify-between text-xs font-mono text-emerald-400">
                 <span>CLOUD SYNC</span>
@@ -1307,6 +1377,40 @@ export default function App() {
                   <span className="font-bold truncate max-w-[160px]">{userSession.email}</span>
                 </div>
               )}
+
+              {/* Landing Page Button */}
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setSessionView('landing');
+                }}
+                className="w-full py-2 bg-purple-950/80 hover:bg-purple-900 border border-purple-800/40 rounded-lg text-xs font-bold font-mono text-purple-300 hover:text-white transition-all text-center cursor-pointer"
+              >
+                RETURN TO LANDING PAGE
+              </button>
+
+              {/* Privacy & Terms Buttons */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setLegalModal('privacy');
+                  }}
+                  className="py-1.5 text-[10px] font-mono font-bold text-slate-400 hover:text-purple-300 bg-slate-900 border border-slate-800 rounded-lg text-center"
+                >
+                  PRIVACY POLICY
+                </button>
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setLegalModal('terms');
+                  }}
+                  className="py-1.5 text-[10px] font-mono font-bold text-slate-400 hover:text-slate-200 bg-slate-900 border border-slate-800 rounded-lg text-center"
+                >
+                  TERMS OF SERVICE
+                </button>
+              </div>
+
               {userSession && (
                 <button
                   onClick={async () => {
@@ -1481,10 +1585,11 @@ export default function App() {
             { id: 'setlist', label: 'Setlist Builder', icon: Music, desc: 'Tracks & pacing audits' },
             { id: 'budgets', label: 'Cost Accountant', icon: DollarSign, desc: 'Revenues & ledger splits' },
             { id: 'artists', label: 'Band Profiles', icon: Users, desc: 'Manage member roster' },
+            { id: 'collaborate', label: 'Collab Market', icon: Users, desc: 'Musicians & talent' },
             { id: 'linktree', label: 'Link Tree', icon: Link, desc: 'Band member profiles' },
             { id: 'admin', label: 'Site Admin', icon: ShieldCheck, desc: 'Manage leads & campaigns' },
             { id: 'about', label: 'About', icon: Info, desc: 'Our mission & vision' },
-            { id: 'help', label: 'Help', icon: HelpCircle, desc: 'Documentation & guides' },
+            { id: 'help', label: 'Support & Wiki', icon: LifeBuoy, desc: 'How-to, wiki & live hotline' },
           ].map((tab) => {
             const Icon = tab.icon;
             const isSelected = activeTab === tab.id;
@@ -1623,6 +1728,12 @@ export default function App() {
                   aiCredits={aiCredits}
                   maxCredits={getMaxCreditsForTier(userSession?.tier || 'pro')}
                   onDecrementAiCredits={handleDecrementAiCredits}
+                  onAddGig={handleAddGig}
+                  onAddSong={handleAddSong}
+                  onAddBudgetItem={handleAddBudgetItem}
+                  onAddCollaborationRequest={handleAddCollaborationRequest}
+                  onUpdateArtist={handleUpdateArtist}
+                  onNavigateToTab={(tabId) => setActiveTab(tabId as TabId)}
                 />
               )}
               {activeTab === 'tour_map' && (
@@ -1630,7 +1741,7 @@ export default function App() {
                   gigs={gigs}
                   artists={artists}
                   selectedArtistId={selectedArtistId}
-                  userTier={userSession?.tier || 'garage'}
+                  userTier={userSession?.tier || 'pro'}
                   onUpgradeRequest={() => {
                     setSelectedSignupTier('arena');
                     setSessionView('paywall_login');
@@ -1667,7 +1778,19 @@ export default function App() {
                 />
               )}
               {activeTab === 'linktree' && <LinkTreeTab artists={artists} />}
-              {activeTab === 'collaborate' && <CollaborateTab />}
+              {activeTab === 'collaborate' && (
+                <CollaborateTab
+                  requests={collaborationRequests}
+                  artists={artists}
+                  gigs={gigs}
+                  selectedArtistId={selectedArtistId}
+                  onAddRequest={handleAddCollaborationRequest}
+                  onUpdateRequest={handleUpdateCollaborationRequest}
+                  onDeleteRequest={handleDeleteCollaborationRequest}
+                  onAddResponse={handleAddCollaborationResponse}
+                  onUpdateResponseStatus={handleUpdateCollaborationResponseStatus}
+                />
+              )}
               {activeTab === 'admin' && (
                 <AdminTab
                   artists={artists}
@@ -1675,15 +1798,68 @@ export default function App() {
                 />
               )}
               {activeTab === 'about' && <AboutTab onNavigateToTab={(tabId) => setActiveTab(tabId as TabId)} />}
-              {activeTab === 'help' && <HelpTab onNavigateToTab={(tabId) => setActiveTab(tabId as TabId)} />}
+              {activeTab === 'help' && (
+                <HelpTab 
+                  onNavigateToTab={(tabId) => setActiveTab(tabId as TabId)} 
+                  onOpenLegal={(doc) => setLegalModal(doc)}
+                  userEmail={userSession?.email}
+                  artistName={activeArtist?.name}
+                />
+              )}
             </motion.div>
           </AnimatePresence>
         </main>
       </div>
 
-      {/* Footer Area */}
-      <footer className="bg-slate-950 border-t border-slate-900 py-4 text-center text-[10px] text-slate-600 mt-auto">
-        <p>© 2026 Bandz. Constructed for Independent Artists & Band Managers.</p>
+      {/* Footer Area with Support Hotline & Compliance */}
+      <footer className="bg-slate-950 border-t border-slate-900 py-4 px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-[10px] text-slate-500 mt-auto font-mono">
+        <div className="flex flex-wrap items-center gap-2 text-center sm:text-left">
+          <p>© 2026 Bandz Platform. Operated by A-List Webs.</p>
+          <span className="hidden sm:inline">•</span>
+          <button
+            onClick={() => setActiveTab('help')}
+            className="text-emerald-400 hover:text-emerald-300 font-bold transition-colors cursor-pointer flex items-center gap-1"
+          >
+            <Phone size={11} />
+            <span>Support: (951) 594-5105</span>
+          </button>
+          <span>•</span>
+          <a href="mailto:support@alistwebs.com" className="text-purple-400 hover:underline">
+            support@alistwebs.com
+          </a>
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-4">
+          <button
+            onClick={() => setActiveTab('help')}
+            className="hover:text-purple-300 transition-colors cursor-pointer"
+          >
+            How-To & Wiki
+          </button>
+          <span>•</span>
+          <button 
+            onClick={() => setLegalModal('privacy')} 
+            className="hover:text-purple-300 transition-colors cursor-pointer flex items-center gap-1"
+          >
+            <ShieldCheck size={11} className="text-emerald-400" />
+            <span>Privacy Policy (Google Verified)</span>
+          </button>
+          <span>•</span>
+          <button 
+            onClick={() => setLegalModal('terms')} 
+            className="hover:text-purple-300 transition-colors cursor-pointer"
+          >
+            Terms of Service
+          </button>
+          <span>•</span>
+          <a 
+            href="https://myaccount.google.com/permissions" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="text-purple-400 hover:underline"
+          >
+            Google Permissions
+          </a>
+        </div>
       </footer>
 
       {/* Floating Action Quick Add Menu */}
@@ -1694,7 +1870,50 @@ export default function App() {
         onAddSong={handleAddSong}
         onAddBudgetItem={handleAddBudgetItem}
         onNavigateToTab={(tabId) => setActiveTab(tabId as TabId)}
+        onOpenSharon={() => setShowSharonModal(true)}
       />
+
+      {/* Floating Sharon AI Manager Modal */}
+      <AnimatePresence>
+        {showSharonModal && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl border border-purple-500/30"
+            >
+              <SharonAssistant
+                artists={artists}
+                activeArtist={artists.find(a => selectedArtistId === 'all' ? a.id === gigs[0]?.artistId : a.id === selectedArtistId) || artists[0]}
+                gigs={gigs}
+                onAddGig={handleAddGig}
+                onAddSong={handleAddSong}
+                onAddBudgetItem={handleAddBudgetItem}
+                onAddCollaborationRequest={handleAddCollaborationRequest}
+                onUpdateArtist={handleUpdateArtist}
+                onNavigateToTab={(tabId) => {
+                  setActiveTab(tabId as TabId);
+                  setShowSharonModal(false);
+                }}
+                onClose={() => setShowSharonModal(false)}
+                isModal={true}
+              />
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Legal Documentation Modal */}
+      <AnimatePresence>
+        {legalModal !== null && (
+          <LegalDocsModal
+            isOpen={true}
+            initialDoc={legalModal}
+            onClose={() => setLegalModal(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

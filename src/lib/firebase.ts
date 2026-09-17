@@ -17,3 +17,4 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app, config.firestoreDatabaseId || '(default)');
+export const googleClientId = config.oAuthClientId || (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '323405324328-uq69l385rrt49mki0p6osffrm63ll63i.apps.googleusercontent.com';

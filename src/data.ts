@@ -1,4 +1,4 @@
-import { Artist, Gig, Song, Setlist, BudgetItem, Venue, GigOpportunity, GigApplication, Message, FanProfile, FanNotification } from './types';
+import { Artist, Gig, Song, Setlist, BudgetItem, Venue, GigOpportunity, GigApplication, Message, FanProfile, FanNotification, CollaborationRequest } from './types';
 
 export const INITIAL_FAN_PROFILES: FanProfile[] = [
   {
@@ -355,13 +355,14 @@ export const INITIAL_GIGS: Gig[] = [
     id: 'gig-1',
     title: 'Album Release Showcase',
     artistId: 'artist-1',
+    eventType: 'gig',
     venueName: 'The Crocodile',
     venueAddress: '2200 2nd Ave, Seattle, WA 98121',
     dateTime: '2026-07-15T20:00:00',
     durationMinutes: 90,
     ticketPrice: 15,
     ticketUrl: 'https://thecrocodile.com/events/neon-shadows-album-release',
-    description: 'A headline night to celebrate the release of our second full-length synth-rock album \"Retrograde\". Supporting act: Spark & Static.',
+    description: 'A headline night to celebrate the release of our second full-length synth-rock album "Retrograde". Supporting act: Spark & Static.',
     status: 'confirmed',
     notes: 'Load-in starts at 4:30 PM. Soundcheck at 6:00 PM. Merch booth setup in the back-right corner next to the main bar. Spark & Static goes on at 8:00 PM, we start at 9:15 PM sharp.',
     merchStockStatus: 'ready',
@@ -387,6 +388,7 @@ export const INITIAL_GIGS: Gig[] = [
     id: 'gig-2',
     title: 'Folk Night Fridays',
     artistId: 'artist-2',
+    eventType: 'gig',
     venueName: 'The Sunset Tavern',
     venueAddress: '5433 Ballard Ave NW, Seattle, WA 98107',
     dateTime: '2026-07-24T19:30:00',
@@ -419,6 +421,7 @@ export const INITIAL_GIGS: Gig[] = [
     id: 'gig-3',
     title: 'Block Party Festival',
     artistId: 'artist-1',
+    eventType: 'gig',
     venueName: 'Capitol Hill Block Stage',
     venueAddress: 'E Pike St & 10th Ave, Seattle, WA 98122',
     dateTime: '2026-08-01T16:00:00',
@@ -445,6 +448,98 @@ export const INITIAL_GIGS: Gig[] = [
       flyerDistributed: false,
       outreachCompleted: false,
       ticketsLive: false
+    }
+  },
+  {
+    id: 'gig-4',
+    title: 'Full Setlist Rehearsal & Transitions',
+    artistId: 'artist-1',
+    eventType: 'rehearsal',
+    venueName: 'Blackbird Rehearsal Studios (Room 3)',
+    venueAddress: '4225 Ballard Ave NW, Seattle, WA 98107',
+    dateTime: '2026-07-12T18:00:00',
+    durationMinutes: 180,
+    ticketPrice: 0,
+    description: 'Full 90-minute run-through of the headline tour set. Locking in guitar pedal cue changes and synth presets.',
+    status: 'confirmed',
+    notes: 'Studio access code is #4921. Drum kit & PA provided, bring cymbals, snare, pedalboards, and IEM wireless transmitters.',
+    promoChecklist: {
+      pressRelease: false,
+      socialPost: false,
+      flyerDistributed: false,
+      outreachCompleted: false,
+      ticketsLive: false
+    },
+    rehearsalDetails: {
+      roomStudio: 'Room 3 (Standard Soundproof Suite)',
+      focusSongs: ['Midnight Transmission', 'Retrograde Heart', 'Neon Highway'],
+      equipmentToBring: ['In-Ear Monitors (IEMs)', 'Snare & Cymbals', 'Synth MIDI Rig', 'Backup 9V Batteries', 'Gaffer Tape'],
+      objectives: 'Run 90-minute set without stopping; tighten smooth segue between Song 2 and Song 3; test wireless monitor mix.'
+    }
+  },
+  {
+    id: 'gig-5',
+    title: 'Acoustic EP Vocal & Strings Tracking',
+    artistId: 'artist-2',
+    eventType: 'recording',
+    venueName: 'Orbit Audio Studio',
+    venueAddress: '1417 10th Ave, Seattle, WA 98122',
+    dateTime: '2026-07-20T11:00:00',
+    durationMinutes: 300,
+    ticketPrice: 0,
+    description: 'Tracking lead vocals on the vintage Neumann U67 plus overdubbing cello and mandolin layers for the new single.',
+    status: 'confirmed',
+    notes: 'Engineer Matt Bayles confirmed. Studio lockout rate $75/hr. Bring hard drive for 96kHz 24-bit raw session multi-tracks.',
+    promoChecklist: {
+      pressRelease: false,
+      socialPost: false,
+      flyerDistributed: false,
+      outreachCompleted: false,
+      ticketsLive: false
+    },
+    recordingDetails: {
+      studioName: 'Orbit Audio Seattle',
+      engineerName: 'Matt Bayles',
+      tracksToRecord: ['Oregon Rain (Main Vocals)', 'Riverbed Stones (Cello & Banjo Overdub)'],
+      hourlyRate: 75,
+      sessionGoal: 'Finalize 3 lead vocal comp takes and complete acoustic string embellishments for EP mix delivery.'
+    }
+  },
+  {
+    id: 'gig-6',
+    title: 'Q3 Tour Logistics & Budget Meeting',
+    artistId: 'artist-1',
+    eventType: 'meeting',
+    venueName: 'Caffe Vita Backroom / Hybrid Call',
+    venueAddress: '1005 E Pike St, Seattle, WA 98122',
+    dateTime: '2026-07-10T15:00:00',
+    durationMinutes: 60,
+    ticketPrice: 0,
+    description: 'Quarterly band business meeting to review fall tour gas & lodging estimates, approve vinyl packaging proofs, and schedule rehearsals.',
+    status: 'confirmed',
+    notes: 'Hybrid attendance available via Google Meet link. Please review the budget sheet beforehand.',
+    promoChecklist: {
+      pressRelease: false,
+      socialPost: false,
+      flyerDistributed: false,
+      outreachCompleted: false,
+      ticketsLive: false
+    },
+    meetingDetails: {
+      locationType: 'in_person',
+      meetingLink: 'https://meet.google.com/bnz-live-tour',
+      agendaItems: [
+        'Finalize 5-city Pacific Northwest tour schedule & routing',
+        'Approve 300-unit vinyl LP pressing invoice ($2,200)',
+        'Allocate merch table coverage shifts for The Crocodile',
+        'Review song copyright & mechanical royalty splits'
+      ],
+      actionItems: [
+        'Maya: Upload approved vinyl artwork to Disc Makers',
+        'Leo: Reserve 12-passenger tour van with towing package',
+        'Sarah: Confirm guest keyboardist rehearsal dates'
+      ],
+      decisions: 'Approved $500 marketing spend for Capitol Hill show; agreed on 4-way equal net door split.'
     }
   }
 ];
@@ -568,3 +663,136 @@ export const INITIAL_BUDGETS: BudgetItem[] = [
     date: '2026-07-24'
   }
 ];
+
+export const INITIAL_COLLABORATION_REQUESTS: CollaborationRequest[] = [
+  {
+    id: 'collab-1',
+    authorArtistId: 'artist-1',
+    authorArtistName: 'Neon Echo',
+    authorContactEmail: 'booking@neonechoband.com',
+    authorGenre: 'Indie Rock / Post-Punk',
+    title: 'Drummer needed for upcoming RINO Room showcase',
+    roleNeeded: 'drummer',
+    skillsRequired: ['Rock / Indie', 'In-Ear Monitors (IEMs)', 'Click Track', 'Tight Dynamic Segues'],
+    description: 'Our regular drummer has a scheduling conflict for our upcoming headline slot at The RINO Room. Looking for a skilled, energetic drummer who can lock in with our 45-minute set (6 original tracks). We have rehearsal space booked in Seattle with full kit provided.',
+    location: 'Seattle, WA',
+    isRemote: false,
+    gigId: 'gig-1',
+    gigTitle: 'Live at The RINO Room',
+    eventDate: '2026-07-18',
+    deadline: '2026-07-10',
+    compensationType: 'paid_fixed',
+    compensationAmount: '$250 flat fee + drink tab & merch',
+    status: 'open',
+    createdAt: '2026-07-01T12:00:00Z',
+    responses: [
+      {
+        id: 'resp-1',
+        requestId: 'collab-1',
+        responderName: 'Dave Kowalski',
+        responderEmail: 'dave.kowalski.drums@gmail.com',
+        responderPhone: '(206) 555-0194',
+        portfolioUrl: 'https://instagram.com/davedrummerseattle',
+        pitchMessage: "Hey Neon Echo! I've been playing Seattle indie and post-punk for 7 years. I play to a click, have my own IEM rig (Shure SE215s), and can rehearse anytime this week. Checked your track 'Midnight Transmission' — absolute banger.",
+        offeredRate: '$250 flat fee works great for me',
+        status: 'pending',
+        createdAt: '2026-07-02T14:30:00Z'
+      }
+    ]
+  },
+  {
+    id: 'collab-2',
+    authorArtistId: 'artist-2',
+    authorArtistName: 'Fable & Fern',
+    authorContactEmail: 'mgmt@fableandfern.com',
+    authorGenre: 'Indie Folk / Americana',
+    title: 'Graphic designer for tour poster & limited merch prints',
+    roleNeeded: 'graphic_designer',
+    skillsRequired: ['Screenprint Prep', 'Vector Art', 'Typography', 'Merch Layout'],
+    description: 'Seeking a visual artist / graphic designer to design a 3-color silkscreen tour poster and matching tote bag art for our Pacific Northwest acoustic run. Need print-ready CMYK/vector files with custom hand-drawn typography and botanical/forest aesthetic.',
+    location: 'Remote / Digital',
+    isRemote: true,
+    eventDate: '2026-07-24',
+    deadline: '2026-07-15',
+    compensationType: 'paid_fixed',
+    compensationAmount: '$350 project fee + free merch pack',
+    status: 'open',
+    createdAt: '2026-07-03T09:30:00Z',
+    responses: [
+      {
+        id: 'resp-2',
+        requestId: 'collab-2',
+        responderName: 'Maya Chen (Studio Fern)',
+        responderEmail: 'maya@studiofernart.com',
+        portfolioUrl: 'https://behance.net/mayachen_posters',
+        pitchMessage: "Hi Fable & Fern! I specialize in folk and indie gig posters with organic textures and bespoke lettering. I've designed official posters for Showbox and Tractor Tavern artists. Would love to send over initial rough sketches!",
+        offeredRate: '$350 flat project rate',
+        status: 'shortlisted',
+        createdAt: '2026-07-04T10:15:00Z'
+      }
+    ]
+  },
+  {
+    id: 'collab-3',
+    authorArtistId: 'artist-1',
+    authorArtistName: 'Neon Echo',
+    authorContactEmail: 'booking@neonechoband.com',
+    authorGenre: 'Indie Rock / Post-Punk',
+    title: 'Live sound engineer (FOH) for Sunset Tavern showcase',
+    roleNeeded: 'sound_engineer',
+    skillsRequired: ['Digital Consoles (Behringer X32)', 'Live Vocal Compression', 'In-Ear Mix Routing', 'Soundcheck Discipline'],
+    description: 'Need a trusted Front of House sound engineer for our Sunset Tavern Friday night performance. We run stereo guitar pedals, synth pad lines, and 3 vocal mics with wireless IEM splitters. Experience mixing high-energy indie rock in mid-sized club rooms is preferred.',
+    location: 'Seattle, WA (Ballard)',
+    isRemote: false,
+    gigId: 'gig-2',
+    gigTitle: 'Sunset Tavern Showcase',
+    eventDate: '2026-07-24',
+    deadline: '2026-07-20',
+    compensationType: 'paid_fixed',
+    compensationAmount: '$200 cash payout at soundcheck',
+    status: 'open',
+    createdAt: '2026-07-05T16:00:00Z',
+    responses: []
+  },
+  {
+    id: 'collab-4',
+    authorArtistId: 'artist-ext-1',
+    authorArtistName: 'The Copper Tones',
+    authorContactEmail: 'thecoppertonesband@gmail.com',
+    authorGenre: 'Psychedelic Rock / Blues',
+    title: 'Videographer & Reel Creator for Summer Festival Set',
+    roleNeeded: 'videographer',
+    skillsRequired: ['4K Mirrorless / Mobile', 'Gimbal Rig', 'Vertical Video (9:16)', 'Quick Turnaround Reels'],
+    description: 'We have a 45-minute afternoon festival set and want dynamic crowd and stage footage captured for TikTok and Instagram Reels. Deliverables: 2 polished 30-sec promo reels within 48 hours + full raw B-roll folder.',
+    location: 'Denver, CO (Outdoor Festival)',
+    isRemote: false,
+    eventDate: '2026-08-01',
+    deadline: '2026-07-28',
+    compensationType: 'paid_fixed',
+    compensationAmount: '$300 + Artist All-Access Pass',
+    status: 'open',
+    createdAt: '2026-07-06T11:20:00Z',
+    responses: []
+  },
+  {
+    id: 'collab-5',
+    authorArtistId: 'artist-2',
+    authorArtistName: 'Fable & Fern',
+    authorContactEmail: 'mgmt@fableandfern.com',
+    authorGenre: 'Indie Folk / Americana',
+    title: 'Guest female vocalist for alt-country duet single',
+    roleNeeded: 'vocalist',
+    skillsRequired: ['Harmonies', 'Acoustic Folk / Americana', 'Warm Timbre', 'Studio Precision'],
+    description: 'Looking for a soulful guest vocalist to record harmony vocals and a counter-melody bridge on our upcoming studio acoustic single "Mountain Whispers". In-studio recording session in Ballard, or high-quality remote stems (WAV 24-bit 48kHz).',
+    location: 'Seattle, WA or Remote Stems',
+    isRemote: true,
+    eventDate: '2026-08-15',
+    deadline: '2026-08-05',
+    compensationType: 'paid_fixed',
+    compensationAmount: '$200 session fee + 15% streaming songwriter split',
+    status: 'open',
+    createdAt: '2026-07-07T14:45:00Z',
+    responses: []
+  }
+];
+

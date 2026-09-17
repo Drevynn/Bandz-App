@@ -89,6 +89,26 @@
         "sentAt": "string",
         "recipientsCount": "number"
       }
+    },
+    "collaboration_requests": {
+      "fields": {
+        "id": "string",
+        "userId": "string",
+        "authorArtistId": "string",
+        "authorArtistName": "string",
+        "authorContactEmail": "string",
+        "title": "string",
+        "roleNeeded": "string",
+        "skillsRequired": "array",
+        "description": "string",
+        "location": "string",
+        "isRemote": "boolean",
+        "compensationType": "string",
+        "compensationAmount": "string",
+        "status": "string",
+        "responses": "array",
+        "createdAt": "string"
+      }
     }
   }
 }

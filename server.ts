@@ -38,6 +38,271 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', hasAiKey: !!apiKey });
 });
 
+// Google OAuth Client Configuration (Exposing public web client ID, NEVER the client_secret)
+app.get('/api/auth/google/config', (req, res) => {
+  res.json({
+    clientId: process.env.GOOGLE_CLIENT_ID || '323405324328-uq69l385rrt49mki0p6osffrm63ll63i.apps.googleusercontent.com',
+    projectId: process.env.GOOGLE_PROJECT_ID || 'bandz-508612',
+    authUri: 'https://accounts.google.com/o/oauth2/auth',
+  });
+});
+
+// ==========================================
+// SHARON (THE AI BAND MANAGER) DISPATCH ROUTE
+// ==========================================
+app.post('/api/sharon-action', async (req, res) => {
+  const { message, artist, currentDate } = req.body;
+
+  if (!message || typeof message !== 'string') {
+    return res.status(400).json({ error: 'Message is required for Sharon.' });
+  }
+
+  const cleanMsg = message.trim();
+  const artistName = artist?.name || 'the band';
+  const referenceDate = currentDate || new Date().toISOString().split('T')[0];
+
+  // Helper: Deterministic NLP fallback parser in case Gemini API key is absent or offline
+  const fallbackParse = (text: string) => {
+    const lower = text.toLowerCase();
+
+    // 1. Check for gig / show / concert / event addition
+    // Example: "Sharon add the RINO room gig Dec 1 2026" or "add RINO room Dec 1 2026"
+    if (lower.includes('gig') || lower.includes('show') || lower.includes('concert') || lower.includes('venue') || lower.includes('rino room')) {
+      // Extract venue name
+      let venue = 'RINO Room';
+      if (lower.includes('rino room')) {
+        venue = 'RINO Room';
+      } else {
+        const venueMatch = text.match(/(?:at|the)\s+([A-Za-z0-9\s'&.-]+?)(?:\s+(?:gig|show|on|at|Dec|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|\d))/i);
+        if (venueMatch && venueMatch[1]) {
+          venue = venueMatch[1].trim();
+        }
+      }
+
+      // Extract date
+      let dateIso = '2026-12-01T20:00:00.000Z';
+      const yearMatch = text.match(/\b(202\d)\b/);
+      const year = yearMatch ? yearMatch[1] : '2026';
+      
+      const monthRegex = /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s*,\s*|\s+)?(\d{4})?/i;
+      const monthMatch = text.match(monthRegex);
+
+      if (monthMatch) {
+        const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+        const mIdx = monthNames.findIndex(m => monthMatch[1].toLowerCase().startsWith(m));
+        const day = parseInt(monthMatch[2], 10);
+        const y = monthMatch[3] ? parseInt(monthMatch[3], 10) : parseInt(year, 10);
+        const d = new Date(Date.UTC(y, mIdx, day, 20, 0, 0));
+        dateIso = d.toISOString();
+      }
+
+      return {
+        action: 'add_gig',
+        data: {
+          title: `Live at ${venue}`,
+          venueName: venue,
+          venueAddress: `${venue}, Seattle, WA`,
+          dateTime: dateIso,
+          ticketPrice: 15,
+          ticketUrl: '',
+          durationMinutes: 60,
+          description: `Live performance booked by Sharon (AI Manager) for ${artistName}.`,
+          eventType: 'gig'
+        },
+        reply: `Got it! I am Sharon, your AI Band Manager. I've added the ${venue} gig on ${new Date(dateIso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} at 8:00 PM directly into your Tour Schedule. Standard $15 ticket price applied!`
+      };
+    }
+
+    // 2. Check for rehearsal addition
+    if (lower.includes('rehearsal') || lower.includes('practice') || lower.includes('jam session')) {
+      const d = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+      d.setHours(19, 0, 0, 0);
+      return {
+        action: 'add_gig',
+        data: {
+          title: 'Full Band Rehearsal',
+          venueName: 'Soundcheck Studios - Room 3',
+          venueAddress: '1240 Industrial Ave, Seattle, WA',
+          dateTime: d.toISOString(),
+          ticketPrice: 0,
+          durationMinutes: 120,
+          description: 'Rehearsal scheduled by Sharon (AI Manager). Focus on setlist transitions and tempo tighteners.',
+          eventType: 'rehearsal'
+        },
+        reply: `Done! I've scheduled a band rehearsal at Soundcheck Studios on ${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} at 7:00 PM in your schedule calendar.`
+      };
+    }
+
+    // 3. Check for song addition
+    if (lower.includes('song') || lower.includes('track')) {
+      const titleMatch = text.match(/(?:add song|new song|track)\s+['"]?([^'"]+?)['"]?(?:\s+(?:in|at|key|bpm|\d)|$)/i);
+      const songTitle = titleMatch ? titleMatch[1].trim() : 'New Track';
+      return {
+        action: 'add_song',
+        data: {
+          title: songTitle,
+          durationSec: 215,
+          bpm: 124,
+          key: 'A Minor',
+          isOriginal: true,
+          status: 'ready'
+        },
+        reply: `Added! I've entered the song "${songTitle}" into your Master Song Catalog & Setlist Composer (215s, 124 BPM, Key of Am).`
+      };
+    }
+
+    // 4. Check for budget / expense / income addition
+    if (lower.includes('expense') || lower.includes('cost') || lower.includes('spent') || lower.includes('income') || lower.includes('earned') || lower.includes('$')) {
+      const isIncome = lower.includes('income') || lower.includes('earned') || lower.includes('payout') || lower.includes('guarantee');
+      const amountMatch = text.match(/\$?(\d+(?:\.\d{2})?)/);
+      const amount = amountMatch ? parseFloat(amountMatch[1]) : 150;
+      const descMatch = text.match(/(?:for|from|on)\s+([A-Za-z0-9\s]+)$/i);
+      const title = descMatch ? descMatch[1].trim() : (isIncome ? 'Performance Payout' : 'Band Gear / Travel Expense');
+
+      return {
+        action: 'add_budget',
+        data: {
+          title: title,
+          amount: amount,
+          type: isIncome ? 'income' : 'expense',
+          category: isIncome ? 'venue_guarantee' : 'gear'
+        },
+        reply: `Logged! I've recorded the $${amount} ${isIncome ? 'income' : 'expense'} for "${title}" directly into your Financial Split Ledger.`
+      };
+    }
+
+    // 5. Check for collaborator request (drummer, guitarist, designer, sound engineer)
+    if (lower.includes('collaborat') || lower.includes('drummer') || lower.includes('designer') || lower.includes('sound engineer') || lower.includes('poster') || lower.includes('need a ')) {
+      let role = 'drummer';
+      if (lower.includes('designer') || lower.includes('poster')) role = 'graphic_designer';
+      else if (lower.includes('sound engineer') || lower.includes('audio')) role = 'sound_engineer';
+      else if (lower.includes('guitar')) role = 'lead_guitar';
+      else if (lower.includes('bass')) role = 'bass';
+      else if (lower.includes('photo') || lower.includes('video')) role = 'videographer';
+      else if (lower.includes('keyboard') || lower.includes('synth')) role = 'keyboards';
+
+      const roleClean = role.replace(/_/g, ' ');
+      return {
+        action: 'add_collaboration',
+        data: {
+          title: `${roleClean.charAt(0).toUpperCase() + roleClean.slice(1)} needed for upcoming gig`,
+          roleNeeded: role,
+          description: `Seeking a skilled and dependable ${roleClean} to collaborate with ${artistName}. Must have professional equipment and strong timing.`,
+          skillsRequired: ['Live Performance', 'In-Ear Monitors', 'Reliable Transport'],
+          compensationType: 'paid_fixed',
+          compensationAmount: '$200 flat fee',
+          location: 'Seattle, WA',
+          isRemote: role === 'graphic_designer'
+        },
+        reply: `Posted! I am Sharon, your AI Band Manager. I've published a "Seeking Collaborator" request for a ${roleClean} directly into the BandAide Collaboration Marketplace!`
+      };
+    }
+
+    // 6. Default conversational reply from Sharon
+    return {
+      action: 'chat',
+      data: {},
+      reply: `Hi! I'm Sharon, your AI Band Manager. You can tell me to manage your band anytime — like "Sharon add the RINO room gig Dec 1 2026", "Sharon schedule rehearsal this Thursday", "Sharon find a drummer for our gig", or "Sharon log $200 expense for merch". What should we tackle next for ${artistName}?`
+    };
+  };
+
+  if (!ai) {
+    const fallbackResult = fallbackParse(cleanMsg);
+    return res.json(fallbackResult);
+  }
+
+  try {
+    const prompt = `
+      You are Sharon, the experienced, sharp, and proactive AI Band Manager for the independent music artist/band: "${artistName}".
+      Band members give you voice or text commands to manage their schedule, songs, finances, and roster.
+      Today's reference date is: ${referenceDate}.
+
+      The band member's request: "${cleanMsg}"
+
+      Analyze their request and determine if they want to perform an action or ask a management question.
+      Supported Actions:
+      1. "add_gig": Add a show, gig, concert, rehearsal, recording session, or meeting.
+         Extract or infer:
+         - title: string (e.g. "Live at RINO Room" or "Band Rehearsal")
+         - venueName: string (e.g. "RINO Room")
+         - venueAddress: string (e.g. "RINO Room, Seattle, WA")
+         - dateTime: ISO 8601 string (e.g. for "Dec 1 2026", output "2026-12-01T20:00:00.000Z". Default time to 20:00 / 8:00 PM if unspecified).
+         - ticketPrice: number (default 15 if gig, 0 if rehearsal)
+         - ticketUrl: string (empty string if none)
+         - durationMinutes: number (default 60 for gig, 120 for rehearsal)
+         - eventType: "gig" | "rehearsal" | "recording" | "meeting"
+         - description: string
+
+      2. "add_song": Add a track or song to their master repertoire.
+         Extract or infer:
+         - title: string
+         - durationSec: number (e.g. 210 for 3:30)
+         - bpm: number (default 120)
+         - key: string (e.g. "E Minor", "A Minor")
+         - isOriginal: boolean (default true)
+         - status: "ready"
+
+      3. "add_budget": Add a transaction to their ledger.
+         Extract:
+         - title: string
+         - amount: number
+         - type: "income" | "expense"
+         - category: "venue_guarantee" | "merch" | "travel" | "food" | "gear" | "promotion" | "production" | "other"
+
+      4. "add_member": Add a band member or touring crew.
+         Extract:
+         - name: string
+         - role: string (e.g. "Keyboards", "Sound Engineer")
+
+      5. "add_collaboration": Post a "Seeking Collaborator" marketplace request (e.g. drummer needed, graphic designer for poster, sound engineer, etc.).
+         Extract or infer:
+         - title: string
+         - roleNeeded: "drummer" | "lead_guitar" | "bass" | "keyboards" | "backing_vocals" | "sound_engineer" | "lighting_tech" | "tour_manager" | "graphic_designer" | "photographer" | "videographer" | "producer" | "songwriting_partner"
+         - description: string
+         - skillsRequired: string[]
+         - compensationType: "paid_fixed" | "paid_hourly" | "door_split" | "pro_bono"
+         - compensationAmount: string
+         - location: string
+         - isRemote: boolean
+
+      6. "chat": General advice, question about music promotion, or when no specific entity is added.
+
+      Respond ONLY with a valid JSON block inside \`\`\`json ... \`\`\` adhering to:
+      {
+        "action": "add_gig" | "add_song" | "add_budget" | "add_member" | "add_collaboration" | "chat",
+        "data": { ...extracted fields matching the action... },
+        "reply": "Warm, professional, confident response speaking as Sharon (the AI Band Manager), addressing what you did or answering their question."
+      }
+    `;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: prompt,
+    });
+
+    const text = response.text || '';
+    const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
+    if (jsonMatch && jsonMatch[1]) {
+      const parsed = JSON.parse(jsonMatch[1]);
+      return res.json(parsed);
+    }
+
+    // Try direct parse if returned raw json
+    try {
+      const direct = JSON.parse(text);
+      return res.json(direct);
+    } catch {
+      // Fallback to local parser
+      const fallbackResult = fallbackParse(cleanMsg);
+      return res.json(fallbackResult);
+    }
+  } catch (error: any) {
+    console.error('Gemini Sharon-action error:', error);
+    const fallbackResult = fallbackParse(cleanMsg);
+    return res.json(fallbackResult);
+  }
+});
+
 // 1. Generate Promotional Copy for Gigs
 app.post('/api/generate-promo', async (req, res) => {
   const { gig, artist, platform, customInstruction } = req.body;
@@ -357,6 +622,113 @@ app.post('/api/venue-search', async (req, res) => {
   } catch (error: any) {
     console.error('Gemini venue search error:', error);
     res.status(500).json({ error: 'Failed to search venue specifications: ' + (error.message || error) });
+  }
+});
+
+// ==========================================
+// COLLABORATION MARKETPLACE AI ASSISTANT
+// ==========================================
+app.post('/api/generate-collaboration-draft', async (req, res) => {
+  const { mode, role, title, artistName, gigTitle, compensation, skills, responderName, extraNotes } = req.body;
+
+  try {
+    if (!ai) {
+      if (mode === 'pitch') {
+        return res.json({
+          pitch: `Hey ${artistName || 'there'}! I saw your seeking collaborator request for a ${role || 'collaborator'} and wanted to connect immediately. I have extensive experience in live and studio performance, have professional gear ready to go, and pride myself on prompt rehearsal communication. Looking forward to discussing details and auditioning!`,
+          offeredRate: compensation || '$200 flat fee'
+        });
+      } else {
+        return res.json({
+          title: title || `${role ? role.charAt(0).toUpperCase() + role.slice(1) : 'Musician'} needed for upcoming show`,
+          description: `We are seeking a reliable, high-energy ${role || 'collaborator'} to join us for ${gigTitle ? `our upcoming performance "${gigTitle}"` : 'our upcoming dates and studio project'}. Must be comfortable working in a fast-paced environment and learning set material quickly. We provide full charts and rehearsal stems ahead of time.`,
+          suggestedSkills: ['In-Ear Monitors', 'Click Track', 'Rehearsal Discipline', 'Live Performance']
+        });
+      }
+    }
+
+    if (mode === 'pitch') {
+      const pitchPrompt = `
+        You are Sharon, an expert music industry manager helping a musician or freelance creative (${responderName || 'Artist'}) pitch for an open collaboration request.
+        Request Details:
+        - Band/Client: ${artistName || 'Band'}
+        - Role Needed: ${role || 'Collaborator'}
+        - Target Gig/Project: ${gigTitle || 'Upcoming dates'}
+        - Compensation Offered: ${compensation || 'Standard rate'}
+        - Required Skills: ${Array.isArray(skills) ? skills.join(', ') : (skills || 'General experience')}
+        - Musician Notes: ${extraNotes || 'Ready to rehearse'}
+
+        Write a concise, professional, and confident 2-paragraph pitch explaining why they are the right fit, their technical readiness (in-ear monitors, gear, click track, print-ready files, etc.), and positive collaborative attitude.
+        Return ONLY a JSON block:
+        \`\`\`json
+        {
+          "pitch": "...",
+          "suggestedRate": "..."
+        }
+        \`\`\`
+      `;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: pitchPrompt
+      });
+
+      const text = response.text || '';
+      const match = text.match(/```json\s*([\s\S]*?)\s*```/);
+      if (match && match[1]) {
+        return res.json(JSON.parse(match[1]));
+      }
+
+      return res.json({
+        pitch: text.replace(/```json|```/g, '').trim(),
+        suggestedRate: compensation || 'Open to discuss'
+      });
+    } else {
+      const listingPrompt = `
+        You are Sharon, an AI Band Manager helping the independent band "${artistName || 'Our Band'}" write a high-converting "Seeking Collaborator" marketplace listing.
+        Listing Specifications:
+        - Role needed: ${role || 'Musician'}
+        - Proposed Headline: ${title || ''}
+        - Associated Gig: ${gigTitle || 'Upcoming Live Showcase'}
+        - Compensation: ${compensation || 'Paid show fee'}
+        - Extra notes: ${extraNotes || ''}
+
+        Write an engaging, clear listing that attracts top local talent.
+        Return ONLY a JSON block:
+        \`\`\`json
+        {
+          "title": "Clear punchy headline (e.g. 'Drummer needed for upcoming RINO Room gig')",
+          "description": "Engaging 2-paragraph description of the role, set length, rehearsal expectations, and vibes.",
+          "suggestedSkills": ["Skill 1", "Skill 2", "Skill 3", "Skill 4"]
+        }
+        \`\`\`
+      `;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: listingPrompt
+      });
+
+      const text = response.text || '';
+      const match = text.match(/```json\s*([\s\S]*?)\s*```/);
+      if (match && match[1]) {
+        return res.json(JSON.parse(match[1]));
+      }
+
+      return res.json({
+        title: title || `${role} needed for ${gigTitle || 'upcoming gig'}`,
+        description: text.replace(/```json|```/g, '').trim(),
+        suggestedSkills: ['Stage Presence', 'In-Ear Monitors', 'Click Track']
+      });
+    }
+  } catch (err: any) {
+    console.error('Error generating collaboration draft:', err);
+    res.json({
+      title: title || `${role} needed for ${gigTitle || 'upcoming project'}`,
+      description: `Seeking a skilled and passionate ${role} to collaborate with our team. Please reach out with audio samples or portfolio links!`,
+      pitch: `Hi there! I would love to collaborate on this project. I have extensive experience in this area and have reliable professional equipment ready.`,
+      suggestedSkills: ['Teamwork', 'Punctuality', 'Professional Gear']
+    });
   }
 });
 

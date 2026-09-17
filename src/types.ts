@@ -105,6 +105,31 @@ export interface VenueSearchData {
   isDemo?: boolean;
 }
 
+export type EventType = 'gig' | 'rehearsal' | 'recording' | 'meeting';
+
+export interface RehearsalDetails {
+  roomStudio?: string;
+  focusSongs?: string[];
+  equipmentToBring?: string[];
+  objectives?: string;
+}
+
+export interface RecordingDetails {
+  studioName?: string;
+  engineerName?: string;
+  tracksToRecord?: string[];
+  hourlyRate?: number;
+  sessionGoal?: string;
+}
+
+export interface MeetingDetails {
+  locationType?: 'in_person' | 'video_call';
+  meetingLink?: string;
+  agendaItems?: string[];
+  actionItems?: string[];
+  decisions?: string;
+}
+
 export interface Gig {
   id: string;
   title: string;
@@ -124,6 +149,10 @@ export interface Gig {
   merchStockNotes?: string;
   merchChecklist?: Record<string, boolean>;
   venueData?: VenueSearchData;
+  eventType?: EventType;
+  rehearsalDetails?: RehearsalDetails;
+  recordingDetails?: RecordingDetails;
+  meetingDetails?: MeetingDetails;
 }
 
 export interface Song {
@@ -238,5 +267,69 @@ export interface FanNotification {
   message: string;
   timestamp: string;
   read: boolean;
+}
+
+export type CollaboratorRole = 
+  | 'drummer'
+  | 'bassist'
+  | 'guitarist'
+  | 'vocalist'
+  | 'keyboardist'
+  | 'percussionist'
+  | 'sound_engineer'
+  | 'graphic_designer'
+  | 'videographer'
+  | 'photographer'
+  | 'producer'
+  | 'tour_manager'
+  | 'lighting_tech'
+  | 'songwriter'
+  | 'session_musician'
+  | 'other';
+
+export type CollaborationCompensationType = 
+  | 'paid_fixed'     // e.g. Fixed fee ($250 for gig, $150 for poster)
+  | 'paid_hourly'    // Hourly rate
+  | 'door_split'     // % of door / ticket split
+  | 'trade_credit'   // Non-monetary / portfolio / credit / merch trade
+  | 'volunteer';     // Unpaid jam / audition / collaboration
+
+export interface CollaborationResponse {
+  id: string;
+  requestId: string;
+  responderArtistId?: string;
+  responderName: string;
+  responderEmail: string;
+  responderPhone?: string;
+  portfolioUrl?: string; // Portfolio, Instagram, Spotify, SoundCloud, or Web link
+  pitchMessage: string;
+  offeredRate?: string;
+  status: 'pending' | 'accepted' | 'declined' | 'shortlisted';
+  createdAt: string;
+}
+
+export interface CollaborationRequest {
+  id: string;
+  userId?: string;
+  authorArtistId: string;
+  authorArtistName: string;
+  authorContactEmail: string;
+  authorGenre?: string;
+  title: string; // e.g. "Drummer needed for RINO Room gig", "Graphic designer for tour poster"
+  roleNeeded: CollaboratorRole;
+  customRoleName?: string;
+  skillsRequired: string[]; // e.g. ['In-ear monitors', 'Rock', 'Double kick pedal']
+  description: string;
+  location: string; // e.g. "Seattle, WA", "Denver, CO", "Remote"
+  isRemote: boolean;
+  gigId?: string; // Optional linked gig
+  gigTitle?: string;
+  eventDate?: string; // Target show or deadline date
+  deadline?: string;
+  compensationType: CollaborationCompensationType;
+  compensationAmount?: string; // e.g. "$250 flat fee", "20% door cut", "Volunteer"
+  status: 'open' | 'in_discussion' | 'filled' | 'closed';
+  responses: CollaborationResponse[];
+  createdAt: string;
 }
 

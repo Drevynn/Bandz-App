@@ -25,6 +25,7 @@ import {
   OAuthProvider
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import LegalDocsModal, { LegalDocType } from './LegalDocsModal';
 
 interface PaywallLoginProps {
   initialTier?: string;
@@ -46,12 +47,12 @@ export default function PaywallLogin({ initialTier = 'pro', onBack, onSuccess }:
   const [cardExpiry, setCardExpiry] = useState<string>('12/28');
   const [cardCVC, setCardCVC] = useState<string>('193');
   const [cardName, setCardName] = useState<string>('');
+  const [legalDoc, setLegalDoc] = useState<LegalDocType | null>(null);
 
   const tiersInfo: Record<string, { name: string; price: number; desc: string; periodLabel?: string }> = {
-    garage: { name: '3-Month Free Trial', price: 0, desc: '90-day free pass of our scheduling, ledger, and campaign tools.', periodLabel: '$0 FREE' },
-    weekly: { name: 'Weekly Pass', price: 7.75, desc: 'Flexible 7-day access pass with full Touring Pro features & 50 AI weekly credits.', periodLabel: '$7.75/wk' },
-    pro: { name: 'Touring Pro', price: 19, desc: 'Unlimited bands, 150 AI monthly credits, budget split ledgers & event sites.', periodLabel: '$19/mo' },
-    arena: { name: 'Arena Headliner', price: 49, desc: 'Complete agency VIP suite, premium connected tour routing, 500 AI monthly credits.', periodLabel: '$49/mo' }
+    weekly: { name: 'Weekly Pass', price: 7.75, desc: '14-Day Free Trial included ($0 today), then $7.75/wk. Full Touring Pro features & 50 Sharon AI credits/wk.', periodLabel: '/wk' },
+    pro: { name: 'Touring Pro', price: 19, desc: '14-Day Free Trial included ($0 today), then $19/mo. Unlimited bands, 150 Sharon AI credits/mo, split ledgers & event sites.', periodLabel: '/mo' },
+    arena: { name: 'Arena Headliner', price: 49, desc: '14-Day Free Trial included ($0 today), then $49/mo. Complete agency VIP suite, tour routing, 500 Sharon AI credits/mo.', periodLabel: '/mo' }
   };
 
   const fillQuickAdmin = () => {
@@ -102,7 +103,7 @@ export default function PaywallLogin({ initialTier = 'pro', onBack, onSuccess }:
           tier: tier,
           provider: providerName,
           createdAt: new Date().toISOString(),
-          isPremium: tier !== 'garage'
+          isPremium: true
         });
       }
 
@@ -246,7 +247,7 @@ export default function PaywallLogin({ initialTier = 'pro', onBack, onSuccess }:
   const handleCheckoutSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!cardName) {
-      setError('Cardholder Name (or Band Name for trial) is required.');
+      setError('Cardholder Name (or Band Name) is required.');
       return;
     }
     if (!email) {
@@ -255,34 +256,13 @@ export default function PaywallLogin({ initialTier = 'pro', onBack, onSuccess }:
     }
 
     const pwd = password || 'bandz123';
+    const effectiveTier = ['weekly', 'pro', 'arena'].includes(selectedTier) ? selectedTier : 'pro';
 
-    // Safeguard the 3-Month Free Trial from multiple claims
-    if (selectedTier === 'garage') {
-      const isTrialConsumed = localStorage.getItem('bandz_trial_consumed') === 'true';
-      const savedTrialsStr = localStorage.getItem('bandz_registered_trials') || '[]';
-      let trialsList: Array<{ email: string; bandName: string }> = [];
-      try {
-        trialsList = JSON.parse(savedTrialsStr);
-      } catch (err) {
-        trialsList = [];
-      }
-
-      const emailLower = email.toLowerCase().trim();
-      const bandNameLower = cardName.toLowerCase().trim();
-
-      const duplicateEmail = trialsList.some(t => t.email.toLowerCase() === emailLower);
-      const duplicateBand = trialsList.some(t => t.bandName.toLowerCase() === bandNameLower);
-
-      if (isTrialConsumed || duplicateEmail || duplicateBand) {
-        setError('🚫 REDEMPTION PREVENTED: This system environment, email, or band name has already consumed a 3-Month Free Trial license. To prevent trial stacking/churn, please select the Touring Pro or Arena Headliner plan to reactivate.');
-        return;
-      }
-
-      // Claim trial safely
-      trialsList.push({ email: emailLower, bandName: bandNameLower });
-      localStorage.setItem('bandz_registered_trials', JSON.stringify(trialsList));
-      localStorage.setItem('bandz_trial_consumed', 'true');
+    // Record trial start for the chosen tier
+    if (!localStorage.getItem('bandz_trial_start_date')) {
+      localStorage.setItem('bandz_trial_start_date', new Date().toISOString());
     }
+    localStorage.setItem('bandz_trial_tier', effectiveTier);
 
     setError(null);
     setIsSubmitting(true);
@@ -293,22 +273,23 @@ export default function PaywallLogin({ initialTier = 'pro', onBack, onSuccess }:
       const userCredential = await createUserWithEmailAndPassword(auth, email, pwd);
       const user = userCredential.user;
 
-      setStepMsg('Finalizing Band Aide premium license...');
+      setStepMsg('Finalizing Band Aide premium license with 14-day trial...');
       await setDoc(doc(db, 'users', user.uid), {
         email: email,
-        tier: selectedTier,
+        tier: effectiveTier,
         createdAt: new Date().toISOString(),
-        isPremium: selectedTier !== 'garage'
+        isPremium: true,
+        trialStartedAt: new Date().toISOString()
       });
 
       setIsSubmitting(false);
-      onSuccess(selectedTier, email);
+      onSuccess(effectiveTier, email);
     } catch (err: any) {
       console.error(err);
       setIsSubmitting(false);
       if (err.code === 'auth/operation-not-allowed' || err.code === 'auth/admin-restricted-operation' || err.code === 'auth/configuration-not-found' || err.message?.includes('operation-not-allowed')) {
         // Fallback to local session subscription activation if Firebase Auth sign-up is disabled
-        onSuccess(selectedTier, email);
+        onSuccess(effectiveTier, email);
         return;
       }
       let errMsg = 'Failed to process subscription/registration.';
@@ -589,85 +570,91 @@ export default function PaywallLogin({ initialTier = 'pro', onBack, onSuccess }:
             ) : (
               /* Checkout Form */
               <form onSubmit={handleCheckoutSubmit} className="space-y-5">
-                {/* Switch tier selector inside checkout */}
+                {/* Switch tier selector inside checkout - 3 Tiers with Free Trial at Beginning */}
                 <div className="space-y-2">
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Selected Plan Tier</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedTier('garage')}
-                      className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
-                        selectedTier === 'garage' 
-                          ? 'border-purple-500 bg-purple-500/5 shadow-md shadow-purple-500/5' 
-                          : 'border-slate-900 bg-slate-950/40 hover:border-slate-800'
-                      }`}
-                    >
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-[9px] text-purple-400 font-bold uppercase tracking-widest font-mono">STEP 1</span>
-                        <span className="text-[11px] font-bold text-slate-100 leading-tight">3-Mo Trial</span>
-                        <span className="text-[10px] text-slate-300 font-bold mt-0.5">$0 FREE</span>
-                      </div>
-                    </button>
-
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Select Plan Tier</label>
+                    <span className="text-[10px] font-mono font-bold text-emerald-400 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      14-Day Free Trial On All Tiers
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                     <button
                       type="button"
                       onClick={() => setSelectedTier('weekly')}
-                      className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
+                      className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
                         selectedTier === 'weekly' 
-                          ? 'border-cyan-500 bg-cyan-500/10 shadow-md shadow-cyan-500/5' 
+                          ? 'border-cyan-500 bg-cyan-500/10 shadow-md shadow-cyan-500/5 ring-1 ring-cyan-500/40' 
                           : 'border-slate-900 bg-slate-950/40 hover:border-slate-800'
                       }`}
                     >
                       <div className="flex flex-col gap-0.5">
-                        <span className="text-[9px] text-cyan-400 font-bold uppercase tracking-widest font-mono">STEP 2</span>
-                        <span className="text-[11px] font-bold text-slate-100 leading-tight">Weekly Pass</span>
-                        <span className="text-[10px] text-cyan-300 font-bold mt-0.5">$7.75/wk</span>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] text-cyan-400 font-bold uppercase tracking-widest font-mono">WEEKLY</span>
+                          <span className="text-[8px] font-mono font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/40 px-1 py-0.2 rounded">TRIAL</span>
+                        </div>
+                        <span className="text-[12px] font-bold text-slate-100 leading-tight">Weekly Pass</span>
+                        <div className="text-[10px] text-emerald-400 font-bold mt-1 font-mono">$0 Free for 14d</div>
+                        <div className="text-[9.5px] text-slate-400 font-mono">then $7.75/wk</div>
                       </div>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setSelectedTier('pro')}
-                      className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
+                      className={`p-3 rounded-xl border text-left cursor-pointer transition-all relative ${
                         selectedTier === 'pro' 
-                          ? 'border-purple-500 bg-purple-500/5 shadow-md shadow-purple-500/5' 
+                          ? 'border-purple-500 bg-purple-500/10 shadow-md shadow-purple-500/10 ring-1 ring-purple-500/40' 
                           : 'border-slate-900 bg-slate-950/40 hover:border-slate-800'
                       }`}
                     >
                       <div className="flex flex-col gap-0.5">
-                        <span className="text-[9px] text-purple-400 font-bold uppercase tracking-widest font-mono">STEP 3</span>
-                        <span className="text-[11px] font-bold text-slate-100 leading-tight">Touring Pro</span>
-                        <span className="text-[10px] text-slate-300 font-bold mt-0.5">$19/mo</span>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] text-purple-400 font-bold uppercase tracking-widest font-mono">RECOMMENDED</span>
+                          <span className="text-[8px] font-mono font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/40 px-1 py-0.2 rounded">TRIAL</span>
+                        </div>
+                        <span className="text-[12px] font-bold text-slate-100 leading-tight">Touring Pro</span>
+                        <div className="text-[10px] text-emerald-400 font-bold mt-1 font-mono">$0 Free for 14d</div>
+                        <div className="text-[9.5px] text-slate-400 font-mono">then $19/mo</div>
                       </div>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setSelectedTier('arena')}
-                      className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
+                      className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
                         selectedTier === 'arena' 
-                          ? 'border-amber-500 bg-amber-500/5 shadow-md shadow-amber-500/5' 
+                          ? 'border-amber-500 bg-amber-500/10 shadow-md shadow-amber-500/10 ring-1 ring-amber-500/40' 
                           : 'border-slate-900 bg-slate-950/40 hover:border-slate-800'
                       }`}
                     >
                       <div className="flex flex-col gap-0.5">
-                        <span className="text-[9px] text-amber-500 font-bold uppercase tracking-widest font-mono">STEP 4</span>
-                        <span className="text-[11px] font-bold text-slate-100 leading-tight">Arena Headliner</span>
-                        <span className="text-[10px] text-slate-300 font-bold mt-0.5">$49/mo</span>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] text-amber-500 font-bold uppercase tracking-widest font-mono">HEADLINER</span>
+                          <span className="text-[8px] font-mono font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/40 px-1 py-0.2 rounded">TRIAL</span>
+                        </div>
+                        <span className="text-[12px] font-bold text-slate-100 leading-tight">Arena Headliner</span>
+                        <div className="text-[10px] text-emerald-400 font-bold mt-1 font-mono">$0 Free for 14d</div>
+                        <div className="text-[9.5px] text-slate-400 font-mono">then $49/mo</div>
                       </div>
                     </button>
                   </div>
-                  <p className="text-[10px] text-purple-300 font-mono italic leading-tight pt-1">
-                    {tiersInfo[selectedTier]?.desc}
-                  </p>
+
+                  <div className="bg-emerald-950/30 border border-emerald-500/20 rounded-xl p-2.5 flex items-center justify-between">
+                    <p className="text-[10.5px] text-emerald-300 font-mono leading-tight">
+                      🎁 <strong>14-Day Free Trial included:</strong> You are charged <strong>$0.00 today</strong>. Full Sharon AI Manager & all console features are unlocked immediately.
+                    </p>
+                  </div>
                 </div>
 
                 <hr className="border-slate-900" />
 
-                {/* Simulated Stripe Credit Card Inputs / Dynamic Verification */}
+                {/* Account & Billing Card Inputs */}
                 <div className="space-y-3.5">
                   <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">
-                    <span>{selectedTier === 'garage' ? 'Trial Verification' : 'Pay with simulated card'}</span>
+                    <span>Account & Trial Authorization</span>
                     <span className="flex items-center gap-1 text-purple-400 font-bold">
                       <ShieldCheck size={12} /> SECURE GATEWAY
                     </span>
@@ -676,12 +663,12 @@ export default function PaywallLogin({ initialTier = 'pro', onBack, onSuccess }:
                   <div className="space-y-3">
                     <div className="space-y-1">
                       <label className="block text-[9px] font-semibold text-slate-500 uppercase">
-                        {selectedTier === 'garage' ? 'Official Band Name *' : 'Cardholder / Band Name *'}
+                        Band / Act or Member Name *
                       </label>
                       <input
                         type="text"
                         required
-                        placeholder={selectedTier === 'garage' ? "e.g. Nirvana / The Velvet Underground" : "Dave Grohl / Band Treasurer"}
+                        placeholder="e.g. The Black Keys / Band Manager"
                         value={cardName}
                         onChange={(e) => setCardName(e.target.value)}
                         className="w-full bg-slate-950 border border-slate-900 hover:border-slate-800 focus:border-purple-500/50 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none"
@@ -716,70 +703,95 @@ export default function PaywallLogin({ initialTier = 'pro', onBack, onSuccess }:
                       />
                     </div>
 
-                    {selectedTier === 'garage' ? (
-                      <div className="bg-purple-950/30 border border-purple-500/10 p-3.5 rounded-xl space-y-1">
-                        <span className="text-[9.5px] font-mono font-black text-purple-400 block uppercase">🛡️ TRIAL REDEMPTION SAFEGUARD ACTIVATED</span>
-                        <p className="text-[10px] text-slate-400 leading-normal">
-                          This system performs automatic device-node fingerprinting to prevent repeating 3-month trials. Limit: exactly 1 trial pass per band roster. No billing card is required to initialize trial nodes!
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-3 gap-3">
-                        <div className="col-span-2 space-y-1">
-                          <label className="block text-[9px] font-semibold text-slate-500 uppercase font-mono">Card Number</label>
-                          <div className="relative">
-                            <input
-                              type="text"
-                              required
-                              value={cardNumber}
-                              onChange={(e) => setCardNumber(e.target.value)}
-                              className="w-full bg-slate-950 border border-slate-900 hover:border-slate-800 focus:border-purple-500/50 rounded-xl pl-9 pr-3.5 py-2.5 text-xs text-slate-200 focus:outline-none font-mono"
-                            />
-                            <CreditCard size={14} className="absolute left-3 top-3 text-slate-500" />
-                          </div>
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="block text-[9px] font-semibold text-slate-500 uppercase font-mono">Expiry / CVC</label>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="col-span-2 space-y-1">
+                        <label className="block text-[9px] font-semibold text-slate-500 uppercase font-mono">Card Number (Simulated)</label>
+                        <div className="relative">
                           <input
                             type="text"
                             required
-                            value={`${cardExpiry} - ${cardCVC}`}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              if (val.includes('-')) {
-                                const [exp, cvc] = val.split('-');
-                                setCardExpiry(exp.trim());
-                                setCardCVC(cvc.trim());
-                              } else {
-                                setCardExpiry(val);
-                              }
-                            }}
-                            className="w-full bg-slate-950 border border-slate-900 hover:border-slate-800 focus:border-purple-500/50 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none font-mono text-center"
+                            value={cardNumber}
+                            onChange={(e) => setCardNumber(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-900 hover:border-slate-800 focus:border-purple-500/50 rounded-xl pl-9 pr-3.5 py-2.5 text-xs text-slate-200 focus:outline-none font-mono"
                           />
+                          <CreditCard size={14} className="absolute left-3 top-3 text-slate-500" />
                         </div>
                       </div>
-                    )}
+
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-semibold text-slate-500 uppercase font-mono">Expiry / CVC</label>
+                        <input
+                          type="text"
+                          required
+                          value={`${cardExpiry} - ${cardCVC}`}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val.includes('-')) {
+                              const [exp, cvc] = val.split('-');
+                              setCardExpiry(exp.trim());
+                              setCardCVC(cvc.trim());
+                            } else {
+                              setCardExpiry(val);
+                            }
+                          }}
+                          className="w-full bg-slate-950 border border-slate-900 hover:border-slate-800 focus:border-purple-500/50 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none font-mono text-center"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
                 <div className="pt-2">
                   <button
                     type="submit"
-                    className="w-full bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white font-bold text-xs py-3.5 rounded-xl transition-all cursor-pointer shadow-lg shadow-purple-600/20 uppercase tracking-widest"
+                    className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white font-bold text-xs py-3.5 rounded-xl transition-all cursor-pointer shadow-lg shadow-purple-600/20 uppercase tracking-widest flex items-center justify-center gap-2"
                   >
-                    {selectedTier === 'garage' ? 'Activate 3-Month Free Trial' : `Pay $${tiersInfo[selectedTier]?.price} & Launch Premium Console`}
+                    <span>Start 14-Day Free Trial ($0 Today, then ${tiersInfo[selectedTier]?.price}{tiersInfo[selectedTier]?.periodLabel})</span>
                   </button>
+                  <p className="text-[10px] text-center text-slate-500 font-mono mt-1.5">
+                    Cancel anytime before day 14. No hidden lock-in contract.
+                  </p>
                 </div>
               </form>
             )}
           </div>
 
-          <p className="text-[10px] text-slate-500 text-center leading-normal mt-6 pt-4 border-t border-slate-900/40">
-            Simulated checkout environment. Use any dummy card data to successfully activate premium nodes. Your browser's local cache remains intact.
-          </p>
+          <div className="mt-6 pt-4 border-t border-slate-900/60 space-y-2 text-center">
+            <p className="text-[10px] text-slate-400 leading-normal">
+              By proceeding, you agree to our{' '}
+              <button 
+                type="button" 
+                onClick={() => setLegalDoc('terms')}
+                className="text-purple-400 hover:underline font-semibold cursor-pointer"
+              >
+                Terms of Service
+              </button>
+              {' '}and acknowledge our{' '}
+              <button 
+                type="button" 
+                onClick={() => setLegalDoc('privacy')}
+                className="text-purple-400 hover:underline font-semibold cursor-pointer"
+              >
+                Privacy Policy (Google Verified)
+              </button>.
+            </p>
+            <p className="text-[10px] text-slate-500 leading-normal">
+              Simulated checkout environment. Use any dummy card data to successfully activate premium nodes. Your browser's local cache remains intact.
+            </p>
+          </div>
         </div>
       </motion.div>
+
+      {/* Legal Docs Modal */}
+      <AnimatePresence>
+        {legalDoc !== null && (
+          <LegalDocsModal
+            isOpen={true}
+            initialDoc={legalDoc}
+            onClose={() => setLegalDoc(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

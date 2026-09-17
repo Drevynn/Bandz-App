@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Gig, Artist, PromoMaterial } from '../types';
-import { Sparkles, Instagram, Facebook, Mail, FileText, Send, Copy, Check, Loader2, AlertCircle, Calendar, MapPin, Building, Globe, ExternalLink, Link, Eye, Twitter, Share2, ArrowLeft } from 'lucide-react';
+import { Gig, Artist, Song, BudgetItem, PromoMaterial, CollaborationRequest } from '../types';
+import { Sparkles, Instagram, Facebook, Mail, FileText, Send, Copy, Check, Loader2, AlertCircle, Calendar, MapPin, Building, Globe, ExternalLink, Link, Eye, Twitter, Share2, ArrowLeft, Bot } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PublicEventPage } from './PublicPages';
+import SharonAssistant from './SharonAssistant';
 
 interface PromoTabProps {
   gigs: Gig[];
@@ -11,13 +12,32 @@ interface PromoTabProps {
   aiCredits: number;
   maxCredits: number;
   onDecrementAiCredits: () => void;
+  onAddGig: (gig: Gig) => void;
+  onAddSong: (song: Song) => void;
+  onAddBudgetItem: (item: BudgetItem) => void;
+  onAddCollaborationRequest?: (req: CollaborationRequest) => void;
+  onUpdateArtist?: (artist: Artist) => void;
+  onNavigateToTab?: (tabId: string) => void;
 }
 
 type PromoPlatform = 'twitter' | 'instagram' | 'facebook' | 'newsletter' | 'press_release' | 'booking_outreach';
 
-export default function PromoTab({ gigs, artists, selectedArtistId, aiCredits, maxCredits, onDecrementAiCredits }: PromoTabProps) {
-  // Navigation within Promo Tab: 'ai_copier' or 'event_pages'
-  const [promoTabMode, setPromoTabMode] = useState<'ai_copier' | 'event_pages'>('event_pages');
+export default function PromoTab({ 
+  gigs, 
+  artists, 
+  selectedArtistId, 
+  aiCredits, 
+  maxCredits, 
+  onDecrementAiCredits,
+  onAddGig,
+  onAddSong,
+  onAddBudgetItem,
+  onAddCollaborationRequest,
+  onUpdateArtist,
+  onNavigateToTab
+}: PromoTabProps) {
+  // Navigation within Promo Tab: 'sharon', 'event_pages', or 'ai_copier'
+  const [promoTabMode, setPromoTabMode] = useState<'sharon' | 'event_pages' | 'ai_copier'>('sharon');
   
   const [selectedGigId, setSelectedGigId] = useState<string>(gigs[0]?.id || '');
   const [platform, setPlatform] = useState<PromoPlatform>('twitter');
@@ -177,7 +197,19 @@ export default function PromoTab({ gigs, artists, selectedArtistId, aiCredits, m
         </div>
 
         {/* Sub-tab Selection Bar */}
-        <div className="relative z-10 flex bg-slate-950/90 backdrop-blur-md p-1 rounded-xl border border-slate-800 shrink-0 self-start sm:self-auto">
+        <div className="relative z-10 flex flex-wrap bg-slate-950/90 backdrop-blur-md p-1 rounded-xl border border-slate-800 shrink-0 self-start sm:self-auto gap-1">
+          <button
+            onClick={() => setPromoTabMode('sharon')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              promoTabMode === 'sharon' 
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-600/30' 
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Bot size={14} className="text-purple-300" />
+            <span>Sharon (AI Manager)</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          </button>
           <button
             onClick={() => setPromoTabMode('event_pages')}
             className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
@@ -203,6 +235,29 @@ export default function PromoTab({ gigs, artists, selectedArtistId, aiCredits, m
 
       <AnimatePresence mode="wait">
         
+        {/* VIEW 0: SHARON AI BAND MANAGER CONSOLE */}
+        {promoTabMode === 'sharon' && (
+          <motion.div
+            key="sharon"
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -5 }}
+            className="w-full"
+          >
+            <SharonAssistant
+              artists={artists}
+              activeArtist={activeArtist}
+              gigs={gigs}
+              onAddGig={onAddGig}
+              onAddSong={onAddSong}
+              onAddBudgetItem={onAddBudgetItem}
+              onAddCollaborationRequest={onAddCollaborationRequest}
+              onUpdateArtist={onUpdateArtist}
+              onNavigateToTab={onNavigateToTab}
+            />
+          </motion.div>
+        )}
+
         {/* VIEW 1: SHAREABLE EVENT PAGES (Core Requirement) */}
         {promoTabMode === 'event_pages' && (
           <motion.div

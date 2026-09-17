@@ -43,5 +43,14 @@ service cloud.firestore {
     match /campaigns/{campaignId} {
       allow read, write: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
     }
+
+    match /collaboration_requests/{requestId} {
+      // Any authenticated user can browse collaboration marketplace postings
+      allow read: if isAuthenticated();
+      // Users can create a request, or update/respond if authenticated
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+    }
   }
 }

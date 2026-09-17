@@ -1,6 +1,6 @@
 {
   "name": "Bandz Platform",
-  "description": "A workspace for local artists to schedule gigs, build setlists, track budgets, and generate promotional copy with AI.",
+  "description": "The independent band command center for scheduling gigs, building setlists, tour accounting, talent collaboration marketplace, Sharon AI management, and complete support how-to wiki.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
