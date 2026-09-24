@@ -97,6 +97,7 @@ export default function PaywallLogin({ initialTier = 'pro', onBack, onSuccess }:
         tier = userDocSnap.data().tier || tier;
       } else {
         await setDoc(userDocRef, {
+          userId: user.uid,
           email: user.email || `${user.uid}@${providerName}.user`,
           displayName: user.displayName || '',
           photoURL: user.photoURL || '',

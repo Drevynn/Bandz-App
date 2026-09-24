@@ -2,6 +2,7 @@
   "collections": {
     "users": {
       "fields": {
+        "userId": "string",
         "email": "string",
         "tier": "string",
         "createdAt": "timestamp",

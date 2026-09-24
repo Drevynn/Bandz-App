@@ -537,6 +537,7 @@ export default function App() {
             tier = userDocSnap.data().tier || 'pro';
           } else {
             await setDoc(userDocRef, {
+              userId: user.uid,
               email: user.email,
               tier: 'pro',
               createdAt: new Date().toISOString(),
