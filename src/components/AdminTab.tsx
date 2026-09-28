@@ -129,6 +129,8 @@ export default function AdminTab({ artists, gigs }: AdminTabProps) {
   const [simLogs, setSimLogs] = useState<string[]>([]);
   const [simSuccessCount, setSimSuccessCount] = useState(0);
   const [sendingLeads, setSendingLeads] = useState<Record<string, boolean>>({});
+  const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   // Loaded state
   useEffect(() => {
@@ -340,7 +342,11 @@ export default function AdminTab({ artists, gigs }: AdminTabProps) {
   const handleRunSimulation = () => {
     const activeSubscribers = emails.filter(item => item.subscribed);
     if (activeSubscribers.length === 0) {
-      alert('There are no active, subscribed email addresses available to receive this campaign. Please add or check subscription toggles.');
+      setToastMessage({
+        type: 'error',
+        message: 'There are no active, subscribed email addresses available to receive this campaign. Please add or check subscription toggles.'
+      });
+      setTimeout(() => setToastMessage(null), 5000);
       return;
     }
 
@@ -408,7 +414,11 @@ export default function AdminTab({ artists, gigs }: AdminTabProps) {
           setCampaigns(updatedCampaigns);
           localStorage.setItem('bandz_campaigns_history', JSON.stringify(updatedCampaigns));
           setIsSimulating(false);
-          alert(`Campaign successfully sent! Sent to ${total} artist administrator nodes.`);
+          setToastMessage({
+            type: 'success',
+            message: `Campaign successfully sent to ${total} artist administrator nodes!`
+          });
+          setTimeout(() => setToastMessage(null), 5000);
         }, 1200);
       }
     }, intervalTime);
@@ -416,11 +426,14 @@ export default function AdminTab({ artists, gigs }: AdminTabProps) {
 
   // Seed raw data helper
   const handleResetAndSeed = () => {
-    if (window.confirm('This will wipe your current local email list and reset to seed sample data. Continue?')) {
-      localStorage.removeItem('bandz_captured_emails');
-      localStorage.removeItem('bandz_campaigns_history');
-      window.location.reload();
-    }
+    setShowResetConfirm(true);
+  };
+
+  const confirmResetAndSeed = () => {
+    localStorage.removeItem('bandz_captured_emails');
+    localStorage.removeItem('bandz_campaigns_history');
+    setShowResetConfirm(false);
+    window.location.reload();
   };
 
   // Filter and Search logic
@@ -1091,6 +1104,68 @@ export default function AdminTab({ artists, gigs }: AdminTabProps) {
                   Save Lead Details
                 </button>
               </form>
+            </motion.div>
+          </div>
+        )}
+        {/* Reset Confirmation Modal */}
+        {showResetConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-slate-900 border border-red-500/30 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl text-left"
+            >
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <AlertCircle className="text-red-400" size={18} />
+                Reset Site Data?
+              </h3>
+              <p className="text-xs text-slate-300">
+                This will wipe your current local email list and reset to default seed sample data. Are you sure you want to proceed?
+              </p>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  onClick={() => setShowResetConfirm(false)}
+                  className="px-3.5 py-2 text-xs font-bold text-slate-400 hover:text-white rounded-lg bg-slate-800 hover:bg-slate-700 transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmResetAndSeed}
+                  className="px-3.5 py-2 text-xs font-bold text-white rounded-lg bg-red-600 hover:bg-red-500 transition-all cursor-pointer shadow-md shadow-red-600/20"
+                >
+                  Confirm Reset
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Status Toast */}
+        {toastMessage && (
+          <div className="fixed bottom-6 right-6 z-50">
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 15 }}
+              className={`p-4 rounded-xl border text-xs font-semibold flex items-center gap-2 shadow-2xl ${
+                toastMessage.type === 'error'
+                  ? 'bg-red-950/90 border-red-500/40 text-red-200'
+                  : 'bg-emerald-950/90 border-emerald-500/40 text-emerald-200'
+              }`}
+            >
+              {toastMessage.type === 'error' ? (
+                <AlertCircle size={16} className="text-red-400 shrink-0" />
+              ) : (
+                <CheckCircle size={16} className="text-emerald-400 shrink-0" />
+              )}
+              <span>{toastMessage.message}</span>
+              <button
+                onClick={() => setToastMessage(null)}
+                className="ml-3 text-slate-400 hover:text-white text-xs font-bold"
+              >
+                ✕
+              </button>
             </motion.div>
           </div>
         )}

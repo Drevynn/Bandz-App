@@ -1,9 +1,37 @@
+export interface MemberMemoryNote {
+  id: string;
+  timestamp: string;
+  note: string;
+  sentiment: 'positive' | 'neutral' | 'attention_needed';
+  context: 'rehearsal' | 'gig' | 'communication' | 'musical_habit' | 'general';
+}
+
+export interface MemberCognitiveProfile {
+  memberId: string;
+  name: string;
+  role: string;
+  email?: string;
+  phone?: string;
+  personalityArchetype: string; // e.g. "The Perfectionist Producer", "The High-Energy Performer"
+  communicationStyle: string; // e.g. "Direct bullet-points", "Needs 48hr advance schedule notice"
+  stressTriggers: string[];
+  musicalStrengths: string[];
+  stagePresenceHabit: string;
+  preferredRehearsalTimes: string;
+  punctualityScore: number; // 0 - 100%
+  inEarMonitorNotes: string;
+  memories: MemberMemoryNote[];
+}
+
 export interface Member {
   id: string;
   name: string;
   role: string;
+  phone?: string;
+  email?: string;
   gearLink?: string;
   instagramUrl?: string;
+  cognitiveProfile?: MemberCognitiveProfile;
 }
 
 export interface NotablePerformance {
@@ -331,5 +359,38 @@ export interface CollaborationRequest {
   status: 'open' | 'in_discussion' | 'filled' | 'closed';
   responses: CollaborationResponse[];
   createdAt: string;
+}
+
+export interface DeepResearchSource {
+  title: string;
+  url: string;
+}
+
+export interface DeepResearchResult {
+  id: string;
+  topic: string;
+  category: 'venue_booking' | 'market_trends' | 'tour_logistics' | 'festival_deadlines' | 'gear_intelligence';
+  timestamp: string;
+  summary: string;
+  keyFindings: string[];
+  executiveActionPlan: string[];
+  sources: DeepResearchSource[];
+}
+
+export interface MediaPipeGestureState {
+  categoryName: string;
+  score: number;
+  label: string;
+  actionDetected?: string;
+}
+
+export interface MediaPipeRehearsalMetrics {
+  stageEnergyScore: number; // 0 - 100
+  focusScore: number; // 0 - 100
+  headMotionPacing: string;
+  movementDynamic: 'steady' | 'moderate' | 'high_energy' | 'explosive';
+  detectedGestures: string[];
+  postureAssessment: string;
+  sharonFeedback: string;
 }
 

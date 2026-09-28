@@ -79,7 +79,7 @@ import { auth, db } from './lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { collection, query, where, getDocs, doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
 
-type TabId = 'scheduler' | 'venues' | 'venue_portal' | 'fan_portal' | 'promo' | 'setlist' | 'budgets' | 'artists' | 'linktree' | 'tour_map' | 'about' | 'help' | 'admin' | 'collaborate';
+type TabId = 'scheduler' | 'venues' | 'venue_portal' | 'fan_portal' | 'promo' | 'sharon' | 'setlist' | 'budgets' | 'artists' | 'linktree' | 'tour_map' | 'about' | 'help' | 'admin' | 'collaborate';
 
 const TAB_HEADER_CONFIG: Record<TabId, {
   badge: string;
@@ -87,6 +87,12 @@ const TAB_HEADER_CONFIG: Record<TabId, {
   desc: string;
   image: string;
 }> = {
+  sharon: {
+    badge: 'SHARON • MULTIMODAL AI BAND MANAGER & ML LAB',
+    title: 'Sharon AI Manager & Machine Learning Hub',
+    desc: 'MediaPipe ML stage presence vision, Google Search grounded deep research, cognitive member memory, and phone & computer skills.',
+    image: '/src/assets/images/hero_banner_stage_1784716444784.jpg'
+  },
   scheduler: {
     badge: 'GIG SCHEDULER & TIMETABLE DISPATCH',
     title: 'Live Tour & Concert Dates',
@@ -1323,6 +1329,7 @@ export default function App() {
                 { id: 'venue_portal', label: 'Venue Portal & Chat', icon: Briefcase },
                 { id: 'fan_portal', label: 'Fan Portal & Alerts', icon: Heart },
                 { id: 'promo', label: 'The Manager', icon: Sparkles },
+                { id: 'sharon', label: 'Sharon Manager (ML)', icon: Bot },
                 { id: 'tour_map', label: 'Tour Map', icon: Compass },
                 { id: 'setlist', label: 'Setlist Builder', icon: Music },
                 { id: 'budgets', label: 'Cost Accountant', icon: DollarSign },
@@ -1582,6 +1589,7 @@ export default function App() {
             { id: 'venue_portal', label: 'Venue Portal & Chat', icon: Briefcase, desc: 'Gig board & messaging' },
             { id: 'fan_portal', label: 'Fan Portal & Alerts', icon: Heart, desc: 'Follow artists & tour updates' },
             { id: 'promo', label: 'The Manager', icon: Sparkles, desc: 'Consult the Manager' },
+            { id: 'sharon', label: 'Sharon Manager (ML)', icon: Bot, desc: 'MediaPipe & Deep Research' },
             { id: 'tour_map', label: 'Tour Map', icon: Compass, desc: 'Geographic Routing' },
             { id: 'setlist', label: 'Setlist Builder', icon: Music, desc: 'Tracks & pacing audits' },
             { id: 'budgets', label: 'Cost Accountant', icon: DollarSign, desc: 'Revenues & ledger splits' },
@@ -1737,6 +1745,21 @@ export default function App() {
                   onNavigateToTab={(tabId) => setActiveTab(tabId as TabId)}
                 />
               )}
+              {activeTab === 'sharon' && (
+                <SharonAssistant
+                  artists={artists}
+                  activeArtist={artists.find(a => selectedArtistId === 'all' ? a.id === gigs[0]?.artistId : a.id === selectedArtistId) || artists[0]}
+                  gigs={gigs}
+                  songs={songs}
+                  onAddGig={handleAddGig}
+                  onAddSong={handleAddSong}
+                  onAddBudgetItem={handleAddBudgetItem}
+                  onAddCollaborationRequest={handleAddCollaborationRequest}
+                  onUpdateArtist={handleUpdateArtist}
+                  onNavigateToTab={(tabId) => setActiveTab(tabId as TabId)}
+                  isModal={false}
+                />
+              )}
               {activeTab === 'tour_map' && (
                 <TourMap
                   gigs={gigs}
@@ -1888,6 +1911,7 @@ export default function App() {
                 artists={artists}
                 activeArtist={artists.find(a => selectedArtistId === 'all' ? a.id === gigs[0]?.artistId : a.id === selectedArtistId) || artists[0]}
                 gigs={gigs}
+                songs={songs}
                 onAddGig={handleAddGig}
                 onAddSong={handleAddSong}
                 onAddBudgetItem={handleAddBudgetItem}

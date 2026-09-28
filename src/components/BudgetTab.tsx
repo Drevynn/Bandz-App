@@ -30,6 +30,7 @@ export default function BudgetTab({
   const [showAddForm, setShowAddForm] = useState(false);
   const [showSplitSheet, setShowSplitSheet] = useState(false);
   const [copiedSplitText, setCopiedSplitText] = useState(false);
+  const [noticeMessage, setNoticeMessage] = useState<string>('');
 
   // Form State
   const [formTitle, setFormTitle] = useState('');
@@ -278,11 +279,24 @@ export default function BudgetTab({
             </select>
           )}
 
+          {noticeMessage && (
+            <div className="bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs p-3 rounded-xl flex items-center justify-between">
+              <span>{noticeMessage}</span>
+              <button 
+                onClick={() => setNoticeMessage('')}
+                className="text-amber-400 hover:text-white ml-2 text-xs font-bold"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <button
               onClick={() => {
                 if (availableGigs.length === 0) {
-                  alert('Please schedule an upcoming gig first to log budget transactions.');
+                  setNoticeMessage('Please schedule an upcoming gig first to log budget transactions.');
+                  setTimeout(() => setNoticeMessage(''), 5000);
                   return;
                 }
                 setShowAddForm(!showAddForm);

@@ -16,16 +16,12 @@ export function PublicEventPage({ gig, artist, onBackToApp }: PublicEventPagePro
     'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=1200&q=80'
   ];
 
-  // Helper to handle calendar subscription or mock action
-  const handleAddToCalendar = () => {
-    const title = encodeURIComponent(gig.title);
-    const details = encodeURIComponent(gig.description || 'Live Performance');
-    const location = encodeURIComponent(`${gig.venueName}, ${gig.venueAddress}`);
-    const startDate = gigDate.toISOString().replace(/-|:|\.\d\d\d/g, "");
-    const endDate = new Date(gigDate.getTime() + gig.durationMinutes * 60000).toISOString().replace(/-|:|\.\d\d\d/g, "");
-    const googleCalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startDate}/${endDate}&details=${details}&location=${location}`;
-    window.open(googleCalUrl, '_blank');
-  };
+  const title = encodeURIComponent(gig.title);
+  const details = encodeURIComponent(gig.description || 'Live Performance');
+  const location = encodeURIComponent(`${gig.venueName}, ${gig.venueAddress}`);
+  const startDate = gigDate.toISOString().replace(/-|:|\.\d\d\d/g, "");
+  const endDate = new Date(gigDate.getTime() + gig.durationMinutes * 60000).toISOString().replace(/-|:|\.\d\d\d/g, "");
+  const googleCalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startDate}/${endDate}&details=${details}&location=${location}`;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans" id="public-event-page-root">
@@ -255,12 +251,14 @@ export function PublicEventPage({ gig, artist, onBackToApp }: PublicEventPagePro
                   </button>
                 )}
 
-                <button 
-                  onClick={handleAddToCalendar}
-                  className="w-full bg-slate-950 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-bold py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-xs transition-all cursor-pointer"
+                <a 
+                  href={googleCalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full bg-slate-950 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-bold py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-xs transition-all cursor-pointer no-underline"
                 >
                   <span>Add to Google Calendar</span>
-                </button>
+                </a>
               </div>
             </div>
           </div>
