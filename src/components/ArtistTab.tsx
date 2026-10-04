@@ -30,7 +30,7 @@ export default function ArtistTab({
 }: ArtistTabProps) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingArtistId, setEditingArtistId] = useState<string | null>(null);
-  const [activeProfileTab, setActiveProfileTab] = useState<'info' | 'music' | 'photos' | 'performances'>('info');
+  const [activeProfileTab, setActiveProfileTab] = useState<'info' | 'music' | 'photos' | 'performances' | 'collaborators'>('info');
   const [previewArtist, setPreviewArtist] = useState<Artist | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -369,7 +369,8 @@ export default function ArtistTab({
                     { id: 'info', label: 'Overview' },
                     { id: 'music', label: 'Streaming & Handles' },
                     { id: 'photos', label: `Gallery (${focusedArtist.photos?.length || 0})` },
-                    { id: 'performances', label: `Performances (${focusedArtist.pastPerformances?.length || 0})` }
+                    { id: 'performances', label: `Performances (${focusedArtist.pastPerformances?.length || 0})` },
+                    { id: 'collaborators', label: `Collaborators (${focusedArtist.linkedCollaborators?.length || 0})` }
                   ].map((tab) => (
                     <button
                       key={tab.id}
@@ -675,6 +676,76 @@ export default function ArtistTab({
                         <div className="bg-slate-950 p-6 rounded-xl border border-slate-900 text-center text-slate-600">
                           <Calendar size={20} className="mx-auto mb-1 text-slate-700" />
                           <p className="text-xs italic">No past performance records logged. Fill your artist timeline to impress booking pitch managers!</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {activeProfileTab === 'collaborators' && (
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-slate-500 block">Linked Collaborators & Co-Bill Partners</span>
+                          <span className="text-xs text-slate-400">Artists linked through accepted BandAide collaboration agreements.</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-purple-400 bg-purple-950/60 border border-purple-500/30 px-2 py-0.5 rounded-full">
+                          {focusedArtist.linkedCollaborators?.length || 0} Connected
+                        </span>
+                      </div>
+
+                      {focusedArtist.linkedCollaborators && focusedArtist.linkedCollaborators.length > 0 ? (
+                        <div className="space-y-2.5">
+                          {focusedArtist.linkedCollaborators.map((collab, idx) => (
+                            <div key={idx} className="bg-slate-950/80 border border-purple-500/30 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-purple-500/50 transition-all">
+                              <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 to-pink-600 flex items-center justify-center text-white text-xs font-bold font-display shadow-md shadow-purple-600/20">
+                                  {collab.artistName.charAt(0)}
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <h5 className="font-bold text-white text-xs font-display">{collab.artistName}</h5>
+                                    {collab.genre && (
+                                      <span className="text-[9px] bg-slate-900 text-slate-400 border border-slate-800 px-1.5 py-0.2 rounded font-mono">
+                                        {collab.genre}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[11px] text-purple-300 font-sans mt-0.5">
+                                    {collab.projectTitle || 'Shared Music Project'}
+                                  </p>
+                                  {collab.linkedGigTitle && (
+                                    <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1 mt-0.5">
+                                      <Calendar size={10} />
+                                      <span>Linked Event: {collab.linkedGigTitle}</span>
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 self-end sm:self-center">
+                                <span className="text-[9.5px] font-mono text-slate-500">
+                                  Linked {new Date(collab.linkedSince).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </span>
+                                {collab.contactEmail && (
+                                  <a
+                                    href={`mailto:${collab.contactEmail}`}
+                                    className="p-1.5 rounded-lg bg-slate-900 hover:bg-purple-950 text-slate-400 hover:text-purple-300 border border-slate-800 transition-colors"
+                                    title={`Email ${collab.artistName}`}
+                                  >
+                                    <Mail size={12} />
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="bg-slate-950 p-6 rounded-xl border border-slate-900 text-center text-slate-500 space-y-2">
+                          <Users size={24} className="mx-auto text-slate-700" />
+                          <p className="text-xs">No linked collaborators yet for this artist.</p>
+                          <p className="text-[11px] text-slate-600 max-w-sm mx-auto">
+                            Head to the <strong>Collaborate</strong> tab to browse artists, send co-bill proposals, and link your events and profiles together!
+                          </p>
                         </div>
                       )}
                     </div>

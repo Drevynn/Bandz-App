@@ -88,9 +88,9 @@ const TAB_HEADER_CONFIG: Record<TabId, {
   image: string;
 }> = {
   sharon: {
-    badge: 'SHARON • MULTIMODAL AI BAND MANAGER & ML LAB',
-    title: 'Sharon AI Manager & Machine Learning Hub',
-    desc: 'MediaPipe ML stage presence vision, Google Search grounded deep research, cognitive member memory, and phone & computer skills.',
+    badge: 'SHARON • EXECUTIVE AI BAND MANAGER & STAGE LAB',
+    title: 'Sharon AI Manager & Stage Command Suite',
+    desc: 'Stage Vision Lab, Industry Deep Research, cognitive member memory, and phone & computer skills.',
     image: '/src/assets/images/hero_banner_stage_1784716444784.jpg'
   },
   scheduler: {
@@ -1329,7 +1329,7 @@ export default function App() {
                 { id: 'venue_portal', label: 'Venue Portal & Chat', icon: Briefcase },
                 { id: 'fan_portal', label: 'Fan Portal & Alerts', icon: Heart },
                 { id: 'promo', label: 'The Manager', icon: Sparkles },
-                { id: 'sharon', label: 'Sharon Manager (ML)', icon: Bot },
+                { id: 'sharon', label: 'Sharon Manager (AI)', icon: Bot },
                 { id: 'tour_map', label: 'Tour Map', icon: Compass },
                 { id: 'setlist', label: 'Setlist Builder', icon: Music },
                 { id: 'budgets', label: 'Cost Accountant', icon: DollarSign },
@@ -1589,7 +1589,7 @@ export default function App() {
             { id: 'venue_portal', label: 'Venue Portal & Chat', icon: Briefcase, desc: 'Gig board & messaging' },
             { id: 'fan_portal', label: 'Fan Portal & Alerts', icon: Heart, desc: 'Follow artists & tour updates' },
             { id: 'promo', label: 'The Manager', icon: Sparkles, desc: 'Consult the Manager' },
-            { id: 'sharon', label: 'Sharon Manager (ML)', icon: Bot, desc: 'MediaPipe & Deep Research' },
+            { id: 'sharon', label: 'Sharon Manager', icon: Bot, desc: 'Vision & Deep Research' },
             { id: 'tour_map', label: 'Tour Map', icon: Compass, desc: 'Geographic Routing' },
             { id: 'setlist', label: 'Setlist Builder', icon: Music, desc: 'Tracks & pacing audits' },
             { id: 'budgets', label: 'Cost Accountant', icon: DollarSign, desc: 'Revenues & ledger splits' },
@@ -1751,8 +1751,12 @@ export default function App() {
                   activeArtist={artists.find(a => selectedArtistId === 'all' ? a.id === gigs[0]?.artistId : a.id === selectedArtistId) || artists[0]}
                   gigs={gigs}
                   songs={songs}
+                  setlists={setlists}
                   onAddGig={handleAddGig}
+                  onUpdateGig={handleUpdateGig}
                   onAddSong={handleAddSong}
+                  onUpdateSong={(updatedSong) => saveSongs(songs.map(s => s.id === updatedSong.id ? updatedSong : s))}
+                  onUpdateSetlist={handleUpdateSetlist}
                   onAddBudgetItem={handleAddBudgetItem}
                   onAddCollaborationRequest={handleAddCollaborationRequest}
                   onUpdateArtist={handleUpdateArtist}
@@ -1813,6 +1817,9 @@ export default function App() {
                   onDeleteRequest={handleDeleteCollaborationRequest}
                   onAddResponse={handleAddCollaborationResponse}
                   onUpdateResponseStatus={handleUpdateCollaborationResponseStatus}
+                  onUpdateArtist={handleUpdateArtist}
+                  onUpdateGig={handleUpdateGig}
+                  onNavigateToTab={(tabId) => setActiveTab(tabId as TabId)}
                 />
               )}
               {activeTab === 'admin' && (
@@ -1850,6 +1857,17 @@ export default function App() {
           <span>•</span>
           <a href="mailto:support@alistwebs.com" className="text-purple-400 hover:underline">
             support@alistwebs.com
+          </a>
+          <span>•</span>
+          <a 
+            href="https://sovranlyip.com" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="text-amber-400 hover:text-amber-300 font-bold transition-colors inline-flex items-center gap-1 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded hover:bg-amber-500/20"
+            title="Visit Sovranly IP"
+          >
+            <span>SovranlyIP.com</span>
+            <ExternalLink size={10} />
           </a>
         </div>
         <div className="flex flex-wrap items-center justify-center gap-4">
@@ -1912,8 +1930,12 @@ export default function App() {
                 activeArtist={artists.find(a => selectedArtistId === 'all' ? a.id === gigs[0]?.artistId : a.id === selectedArtistId) || artists[0]}
                 gigs={gigs}
                 songs={songs}
+                setlists={setlists}
                 onAddGig={handleAddGig}
+                onUpdateGig={handleUpdateGig}
                 onAddSong={handleAddSong}
+                onUpdateSong={(updatedSong) => saveSongs(songs.map(s => s.id === updatedSong.id ? updatedSong : s))}
+                onUpdateSetlist={handleUpdateSetlist}
                 onAddBudgetItem={handleAddBudgetItem}
                 onAddCollaborationRequest={handleAddCollaborationRequest}
                 onUpdateArtist={handleUpdateArtist}

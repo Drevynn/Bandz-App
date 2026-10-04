@@ -2,10 +2,12 @@ import React, { useState, useMemo } from 'react';
 import { 
   CollaborationRequest, 
   CollaborationResponse, 
+  CollaborationMessage,
   CollaboratorRole, 
   CollaborationCompensationType, 
   Artist, 
-  Gig 
+  Gig,
+  LinkedCollaborator
 } from '../types';
 import { 
   Search, 
@@ -35,7 +37,13 @@ import {
   Eye,
   Check,
   Trash2,
-  Tag
+  Tag,
+  Handshake,
+  MessageSquare,
+  Link2,
+  Share2,
+  Radio,
+  Layers
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -49,6 +57,9 @@ interface CollaborateTabProps {
   onDeleteRequest: (id: string) => void;
   onAddResponse: (requestId: string, response: CollaborationResponse) => void;
   onUpdateResponseStatus: (requestId: string, responseId: string, status: 'pending' | 'accepted' | 'declined' | 'shortlisted') => void;
+  onUpdateArtist?: (artist: Artist) => void;
+  onUpdateGig?: (gig: Gig) => void;
+  onNavigateToTab?: (tabId: string) => void;
 }
 
 const ROLE_OPTIONS: { value: CollaboratorRole; label: string; icon: any; category: 'musician' | 'creative' | 'crew' }[] = [
@@ -98,24 +109,33 @@ export const CollaborateTab: React.FC<CollaborateTabProps> = ({
   onUpdateRequest,
   onDeleteRequest,
   onAddResponse,
-  onUpdateResponseStatus
+  onUpdateResponseStatus,
+  onUpdateArtist,
+  onUpdateGig,
+  onNavigateToTab
 }) => {
   // Navigation & Filter States
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [locationFilter, setLocationFilter] = useState<'all' | 'remote' | 'in_person'>('all');
   const [compensationFilter, setCompensationFilter] = useState<'all' | 'paid_fixed' | 'paid_hourly' | 'door_split' | 'trade_credit' | 'volunteer'>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'filled'>('open');
-  const [viewScope, setViewScope] = useState<'all' | 'my_posts' | 'my_pitches'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'filled'>('all');
+  const [viewScope, setViewScope] = useState<'all' | 'my_posts' | 'my_pitches' | 'direct_collabs' | 'messages'>('all');
 
   // Modals & Drawers
   const [showPostModal, setShowPostModal] = useState(false);
+  const [showDirectCollabModal, setShowDirectCollabModal] = useState(false);
   const [respondingToRequest, setRespondingToRequest] = useState<CollaborationRequest | null>(null);
   const [managingRequest, setManagingRequest] = useState<CollaborationRequest | null>(null);
+  const [activeMessagingRequest, setActiveMessagingRequest] = useState<CollaborationRequest | null>(null);
+  const [chatDraftText, setChatDraftText] = useState('');
   const [notificationBanner, setNotificationBanner] = useState<string | null>(null);
 
-  // New Request Form State
+  // Active user / band context
   const defaultArtist = artists.find(a => a.id === selectedArtistId) || artists[0];
+  const activeArtist = defaultArtist || { id: 'default', name: 'My Band', genre: 'Indie Rock', contactEmail: 'contact@band.com' };
+
+  // New Request Form State (Marketplace Listing)
   const [authorArtistId, setAuthorArtistId] = useState<string>(defaultArtist?.id || '');
   const [postTitle, setPostTitle] = useState('');
   const [postRole, setPostRole] = useState<CollaboratorRole>('drummer');
@@ -131,9 +151,22 @@ export const CollaborateTab: React.FC<CollaborateTabProps> = ({
   const [postCompensationAmount, setPostCompensationAmount] = useState('$250 flat fee + drink tabs');
   const [isAiDraftingPost, setIsAiDraftingPost] = useState(false);
 
+  // Direct Artist-to-Artist Proposal State
+  const [directSenderId, setDirectSenderId] = useState<string>(defaultArtist?.id || artists[0]?.id || '');
+  const [directTargetId, setDirectTargetId] = useState<string>(
+    artists.find(a => a.id !== (defaultArtist?.id || artists[0]?.id))?.id || ''
+  );
+  const [directCollabType, setDirectCollabType] = useState<'co_bill_show' | 'tour_support' | 'split_single' | 'guest_musician'>('co_bill_show');
+  const [directTitle, setDirectTitle] = useState('');
+  const [directGigId, setDirectGigId] = useState<string>('');
+  const [directCustomDate, setDirectCustomDate] = useState('');
+  const [directCompensationType, setDirectCompensationType] = useState<CollaborationCompensationType>('door_split');
+  const [directCompensationAmount, setDirectCompensationAmount] = useState('50/50 door & merch split');
+  const [directPitchMessage, setDirectPitchMessage] = useState('');
+
   // New Response Form State
-  const [responderName, setResponderName] = useState('');
-  const [responderEmail, setResponderEmail] = useState('');
+  const [responderName, setResponderName] = useState(defaultArtist?.name || '');
+  const [responderEmail, setResponderEmail] = useState(defaultArtist?.contactEmail || '');
   const [responderPhone, setResponderPhone] = useState('');
   const [responderPortfolio, setResponderPortfolio] = useState('');
   const [responderPitch, setResponderPitch] = useState('');
@@ -144,17 +177,37 @@ export const CollaborateTab: React.FC<CollaborateTabProps> = ({
   const activeRequestsCount = requests.filter(r => r.status === 'open').length;
   const myBandsRequests = useMemo(() => {
     const bandIds = artists.map(a => a.id);
-    return requests.filter(r => bandIds.includes(r.authorArtistId));
+    return requests.filter(r => bandIds.includes(r.authorArtistId) || (r.targetArtistId && bandIds.includes(r.targetArtistId)));
   }, [requests, artists]);
-  const totalResponsesReceived = useMemo(() => {
-    return myBandsRequests.reduce((sum, r) => sum + (r.responses?.length || 0), 0);
-  }, [myBandsRequests]);
+
+  const directProposalsCount = useMemo(() => {
+    return requests.filter(r => r.isDirectArtistCollab).length;
+  }, [requests]);
+
+  const totalConversationsCount = useMemo(() => {
+    return requests.filter(r => r.messages && r.messages.length > 0).length;
+  }, [requests]);
 
   // Filtering
   const filteredRequests = useMemo(() => {
     return requests.filter(req => {
-      // Category filter
-      if (activeCategory !== 'all') {
+      // Scope filter
+      if (viewScope === 'my_posts') {
+        const bandIds = artists.map(a => a.id);
+        if (!bandIds.includes(req.authorArtistId)) return false;
+      } else if (viewScope === 'my_pitches') {
+        const hasMyPitch = (req.responses || []).some(
+          r => r.responderEmail === responderEmail || r.responderName === responderName
+        );
+        if (!hasMyPitch) return false;
+      } else if (viewScope === 'direct_collabs') {
+        if (!req.isDirectArtistCollab) return false;
+      } else if (viewScope === 'messages') {
+        if (!req.messages || req.messages.length === 0) return false;
+      }
+
+      // Category filter (only in general marketplace)
+      if (viewScope === 'all' && activeCategory !== 'all') {
         if (activeCategory === 'musicians') {
           const musicianRoles: CollaboratorRole[] = ['drummer', 'bassist', 'guitarist', 'vocalist', 'keyboardist', 'percussionist', 'songwriter', 'session_musician'];
           if (!musicianRoles.includes(req.roleNeeded)) return false;
@@ -180,27 +233,17 @@ export const CollaborateTab: React.FC<CollaborateTabProps> = ({
       if (statusFilter === 'open' && req.status !== 'open' && req.status !== 'in_discussion') return false;
       if (statusFilter === 'filled' && req.status !== 'filled') return false;
 
-      // Scope filter
-      if (viewScope === 'my_posts') {
-        const bandIds = artists.map(a => a.id);
-        if (!bandIds.includes(req.authorArtistId)) return false;
-      } else if (viewScope === 'my_pitches') {
-        const hasMyPitch = (req.responses || []).some(
-          r => r.responderEmail === responderEmail || r.responderName === responderName
-        );
-        if (!hasMyPitch) return false;
-      }
-
       // Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchesTitle = req.title.toLowerCase().includes(q);
         const matchesDesc = req.description.toLowerCase().includes(q);
         const matchesAuthor = req.authorArtistName.toLowerCase().includes(q);
+        const matchesTarget = (req.targetArtistName || '').toLowerCase().includes(q);
         const matchesLocation = req.location.toLowerCase().includes(q);
         const matchesSkills = req.skillsRequired.some(s => s.toLowerCase().includes(q));
         const matchesRole = req.roleNeeded.toLowerCase().includes(q);
-        if (!matchesTitle && !matchesDesc && !matchesAuthor && !matchesLocation && !matchesSkills && !matchesRole) {
+        if (!matchesTitle && !matchesDesc && !matchesAuthor && !matchesTarget && !matchesLocation && !matchesSkills && !matchesRole) {
           return false;
         }
       }
@@ -243,129 +286,280 @@ export const CollaborateTab: React.FC<CollaborateTabProps> = ({
       const selectedAuthor = artists.find(a => a.id === authorArtistId) || artists[0];
       const selectedGig = gigs.find(g => g.id === postGigId);
 
-      const res = await fetch('/api/generate-collaboration-draft', {
+      const res = await fetch('/api/sharon-action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          mode: 'request',
-          role: postRole,
-          title: postTitle,
-          artistName: selectedAuthor?.name || 'Our Band',
-          genre: selectedAuthor?.genre || 'Indie Rock',
-          gigTitle: selectedGig?.title,
-          compensation: postCompensationAmount,
-          extraNotes: postDescription
+          message: `Draft a concise, exciting collaboration listing for ${selectedAuthor.name} (${selectedAuthor.genre}) seeking a ${postRole}. Event: ${selectedGig?.title || 'upcoming gig'}.`,
+          artist: selectedAuthor,
+          currentDate: new Date().toISOString()
         })
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        if (data.title) setPostTitle(data.title);
-        if (data.description) setPostDescription(data.description);
-        if (Array.isArray(data.suggestedSkills) && data.suggestedSkills.length > 0) {
-          const merged = Array.from(new Set([...postSkills, ...data.suggestedSkills]));
-          setPostSkills(merged);
-        }
+      const data = await res.json();
+      if (data.reply) {
+        setPostDescription(data.reply);
       }
-    } catch (e) {
-      console.warn('AI post drafting fallback:', e);
-      setPostDescription(`We are looking for an experienced ${postRole} for our upcoming live performances and studio tracking. Must be dependable, possess professional equipment, and be comfortable with fast-paced rehearsals.`);
+    } catch (err) {
+      console.error(err);
     } finally {
       setIsAiDraftingPost(false);
     }
   };
 
-  // Trigger Sharon AI to draft pitch
-  const handleAiDraftPitch = async () => {
-    if (!respondingToRequest) return;
-    setIsAiDraftingPitch(true);
-    try {
-      const res = await fetch('/api/generate-collaboration-draft', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mode: 'pitch',
-          role: respondingToRequest.roleNeeded,
-          artistName: respondingToRequest.authorArtistName,
-          gigTitle: respondingToRequest.gigTitle,
-          compensation: respondingToRequest.compensationAmount,
-          skills: respondingToRequest.skillsRequired,
-          responderName: responderName || 'Musician',
-          extraNotes: responderPitch
-        })
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.pitch) setResponderPitch(data.pitch);
-        if (data.suggestedRate && !responderRate) setResponderRate(data.suggestedRate);
-      }
-    } catch (e) {
-      console.warn('AI pitch drafting fallback:', e);
-      setResponderPitch(`Hey ${respondingToRequest.authorArtistName}! I saw your request for a ${respondingToRequest.roleNeeded} and would love to jump in. I have 6+ years playing live, top-shelf gear, and can lock in your setlist immediately. Let's make it happen!`);
-    } finally {
-      setIsAiDraftingPitch(false);
-    }
-  };
-
-  // Submit New Request
+  // Submit standard Marketplace Request
   const handleSubmitPost = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!postTitle.trim() || !postDescription.trim()) return;
-
-    const author = artists.find(a => a.id === authorArtistId) || artists[0] || {
-      id: 'artist-user',
-      name: 'Independent Artist',
-      contactEmail: 'artist@bandz.io'
-    };
+    const selectedAuthor = artists.find(a => a.id === authorArtistId) || artists[0];
+    const selectedGig = gigs.find(g => g.id === postGigId);
 
     const newReq: CollaborationRequest = {
       id: `collab-${Date.now()}`,
-      authorArtistId: author.id,
-      authorArtistName: author.name,
-      authorContactEmail: author.contactEmail || 'booking@bandz.io',
-      authorGenre: author.genre,
+      authorArtistId: selectedAuthor.id,
+      authorArtistName: selectedAuthor.name,
+      authorContactEmail: selectedAuthor.contactEmail,
+      authorGenre: selectedAuthor.genre,
       title: postTitle.trim(),
       roleNeeded: postRole,
-      skillsRequired: postSkills.length > 0 ? postSkills : ['Team Player', 'Reliable'],
+      skillsRequired: postSkills,
       description: postDescription.trim(),
       location: postLocation.trim() || 'Seattle, WA',
       isRemote: postIsRemote,
       gigId: postGigId || undefined,
-      gigTitle: gigs.find(g => g.id === postGigId)?.title || undefined,
+      gigTitle: selectedGig?.title,
       eventDate: postEventDate || undefined,
       deadline: postDeadline || undefined,
       compensationType: postCompensationType,
-      compensationAmount: postCompensationAmount || 'Negotiable',
+      compensationAmount: postCompensationAmount.trim() || undefined,
       status: 'open',
       responses: [],
+      messages: [],
       createdAt: new Date().toISOString()
     };
 
     onAddRequest(newReq);
     setShowPostModal(false);
-
-    // Reset Form
     setPostTitle('');
     setPostDescription('');
-    setPostSkills(['In-Ear Monitors (IEMs)', 'Click Track']);
-    setPostGigId('');
-
-    setNotificationBanner(`Your request "${newReq.title}" has been published to the marketplace!`);
-    setTimeout(() => setNotificationBanner(null), 5000);
+    setNotificationBanner(`Collaboration listing "${newReq.title}" posted to Marketplace!`);
+    setTimeout(() => setNotificationBanner(null), 4000);
   };
 
-  // Submit Response / Pitch
+  // Submit Direct Artist-to-Artist Proposal
+  const handleSubmitDirectProposal = (e: React.FormEvent) => {
+    e.preventDefault();
+    const sender = artists.find(a => a.id === directSenderId) || artists[0];
+    const target = artists.find(a => a.id === directTargetId);
+
+    if (!target) {
+      alert('Please select a recipient artist to propose collaboration with.');
+      return;
+    }
+
+    const linkedGig = gigs.find(g => g.id === directGigId);
+    const title = directTitle.trim() || `Co-bill Collaboration: ${sender.name} & ${target.name}`;
+
+    const newDirectReq: CollaborationRequest = {
+      id: `collab-direct-${Date.now()}`,
+      authorArtistId: sender.id,
+      authorArtistName: sender.name,
+      authorContactEmail: sender.contactEmail,
+      authorGenre: sender.genre,
+      targetArtistId: target.id,
+      targetArtistName: target.name,
+      isDirectArtistCollab: true,
+      collabType: directCollabType,
+      title,
+      roleNeeded: 'session_musician',
+      customRoleName: directCollabType === 'co_bill_show' ? 'Co-Bill Partner' : (directCollabType === 'tour_support' ? 'Tour Support' : 'Collaborating Artist'),
+      skillsRequired: ['Live Performance', 'Co-Bill Draw', 'Stage Pacing', 'Pro Communication'],
+      description: directPitchMessage.trim() || `Direct collaboration proposal from ${sender.name} to ${target.name} for a shared co-bill concert and cross-promotion.`,
+      location: linkedGig?.venueAddress || 'Seattle, WA',
+      isRemote: false,
+      gigId: directGigId || undefined,
+      gigTitle: linkedGig?.title,
+      eventDate: linkedGig?.dateTime || directCustomDate || undefined,
+      compensationType: directCompensationType,
+      compensationAmount: directCompensationAmount.trim() || '50/50 door split',
+      status: 'open',
+      responses: [],
+      messages: [
+        {
+          id: `msg-${Date.now()}`,
+          requestId: `collab-direct-${Date.now()}`,
+          senderArtistId: sender.id,
+          senderName: sender.name,
+          senderRole: 'author',
+          messageText: directPitchMessage.trim() || `Hey ${target.name}! We'd love to link up for a co-bill show. Check out the proposed details and let's coordinate soundcheck & set times!`,
+          timestamp: new Date().toISOString()
+        }
+      ],
+      createdAt: new Date().toISOString()
+    };
+
+    onAddRequest(newDirectReq);
+    setShowDirectCollabModal(false);
+    setDirectTitle('');
+    setDirectPitchMessage('');
+    setNotificationBanner(`Direct collaboration request sent to ${target.name}! Check the Direct Proposals view.`);
+    setTimeout(() => setNotificationBanner(null), 4500);
+  };
+
+  // Accept a collaboration proposal and LINK both profiles and events!
+  const handleAcceptCollaborationAndLink = (
+    req: CollaborationRequest,
+    partnerId?: string,
+    partnerName?: string,
+    responseId?: string
+  ) => {
+    const sender = artists.find(a => a.id === req.authorArtistId);
+    const resolvedPartnerId = partnerId || req.targetArtistId;
+    const partner = artists.find(a => a.id === resolvedPartnerId);
+
+    const partnerDisplayName = partnerName || partner?.name || req.targetArtistName || 'Collaborating Artist';
+
+    // 1. Link Artist Profiles
+    if (onUpdateArtist && sender && partner) {
+      const now = new Date().toISOString();
+
+      // Add partner to sender's profile
+      const senderExisting = sender.linkedCollaborators || [];
+      if (!senderExisting.some(c => c.artistId === partner.id)) {
+        const updatedSender: Artist = {
+          ...sender,
+          linkedCollaborators: [
+            ...senderExisting,
+            {
+              artistId: partner.id,
+              artistName: partner.name,
+              genre: partner.genre,
+              contactEmail: partner.contactEmail,
+              linkedSince: now,
+              collabRequestId: req.id,
+              projectTitle: req.title,
+              linkedGigId: req.gigId,
+              linkedGigTitle: req.gigTitle
+            }
+          ]
+        };
+        onUpdateArtist(updatedSender);
+      }
+
+      // Add sender to partner's profile
+      const partnerExisting = partner.linkedCollaborators || [];
+      if (!partnerExisting.some(c => c.artistId === sender.id)) {
+        const updatedPartner: Artist = {
+          ...partner,
+          linkedCollaborators: [
+            ...partnerExisting,
+            {
+              artistId: sender.id,
+              artistName: sender.name,
+              genre: sender.genre,
+              contactEmail: sender.contactEmail,
+              linkedSince: now,
+              collabRequestId: req.id,
+              projectTitle: req.title,
+              linkedGigId: req.gigId,
+              linkedGigTitle: req.gigTitle
+            }
+          ]
+        };
+        onUpdateArtist(updatedPartner);
+      }
+    }
+
+    // 2. Link Event across both calendars
+    let linkedEventTitle = req.gigTitle;
+    if (req.gigId && onUpdateGig) {
+      const gig = gigs.find(g => g.id === req.gigId);
+      if (gig && partner) {
+        const currentCollabIds = gig.collaboratorArtistIds || [];
+        const currentNames = gig.coBillArtistNames || [];
+        const updatedGig: Gig = {
+          ...gig,
+          collaboratorArtistIds: Array.from(new Set([...currentCollabIds, partner.id])),
+          coBillArtistNames: Array.from(new Set([...currentNames, partner.name])),
+          notes: gig.notes ? `${gig.notes}\n[Co-Bill Partner Confirmed]: ${partner.name}` : `[Co-Bill Partner Confirmed]: ${partner.name}`
+        };
+        onUpdateGig(updatedGig);
+        linkedEventTitle = gig.title;
+      }
+    }
+
+    // 3. Update Request status and append System Chat Message
+    const systemChatMessage: CollaborationMessage = {
+      id: `msg-${Date.now()}`,
+      requestId: req.id,
+      senderName: 'BandAide System',
+      senderRole: 'system',
+      messageText: `🤝 Collaboration officially accepted! Profiles for "${sender?.name || req.authorArtistName}" and "${partnerDisplayName}" are now linked, and "${linkedEventTitle || 'the event'}" is synchronized on both artists' tour schedules.`,
+      timestamp: new Date().toISOString()
+    };
+
+    const updatedResponses = (req.responses || []).map(r => {
+      if (responseId && r.id === responseId) return { ...r, status: 'accepted' as const };
+      return r;
+    });
+
+    const updatedReq: CollaborationRequest = {
+      ...req,
+      status: 'filled',
+      acceptedCollaboratorId: resolvedPartnerId,
+      acceptedCollaboratorName: partnerDisplayName,
+      responses: updatedResponses,
+      messages: [...(req.messages || []), systemChatMessage]
+    };
+
+    onUpdateRequest(updatedReq);
+    if (managingRequest?.id === req.id) {
+      setManagingRequest(updatedReq);
+    }
+    if (activeMessagingRequest?.id === req.id) {
+      setActiveMessagingRequest(updatedReq);
+    }
+
+    setNotificationBanner(`🎉 Success! Profiles for ${sender?.name || req.authorArtistName} & ${partnerDisplayName} are now linked, and the event appears in both tour schedules!`);
+    setTimeout(() => setNotificationBanner(null), 6000);
+  };
+
+  // Send an in-app message
+  const handleSendMessage = (req: CollaborationRequest, textToSend?: string) => {
+    const text = (textToSend || chatDraftText).trim();
+    if (!text) return;
+
+    const isAuthor = req.authorArtistId === activeArtist.id;
+    const newMessage: CollaborationMessage = {
+      id: `msg-${Date.now()}`,
+      requestId: req.id,
+      senderArtistId: activeArtist.id,
+      senderName: activeArtist.name,
+      senderRole: isAuthor ? 'author' : 'collaborator',
+      messageText: text,
+      timestamp: new Date().toISOString()
+    };
+
+    const updatedReq: CollaborationRequest = {
+      ...req,
+      messages: [...(req.messages || []), newMessage]
+    };
+
+    onUpdateRequest(updatedReq);
+    setActiveMessagingRequest(updatedReq);
+    setChatDraftText('');
+  };
+
+  // Submit response pitch to an open request
   const handleSubmitResponse = (e: React.FormEvent) => {
     e.preventDefault();
     if (!respondingToRequest) return;
-    if (!responderName.trim() || !responderEmail.trim() || !responderPitch.trim()) return;
 
     const newResponse: CollaborationResponse = {
       id: `resp-${Date.now()}`,
       requestId: respondingToRequest.id,
-      responderName: responderName.trim(),
-      responderEmail: responderEmail.trim(),
+      responderArtistId: activeArtist.id !== 'default' ? activeArtist.id : undefined,
+      responderName: responderName.trim() || activeArtist.name,
+      responderEmail: responderEmail.trim() || activeArtist.contactEmail,
       responderPhone: responderPhone.trim() || undefined,
       portfolioUrl: responderPortfolio.trim() || undefined,
       pitchMessage: responderPitch.trim(),
@@ -375,32 +569,48 @@ export const CollaborateTab: React.FC<CollaborateTabProps> = ({
     };
 
     onAddResponse(respondingToRequest.id, newResponse);
+
+    // Also append as an in-app message to initiate thread
+    const initialMessage: CollaborationMessage = {
+      id: `msg-${Date.now()}`,
+      requestId: respondingToRequest.id,
+      senderArtistId: activeArtist.id,
+      senderName: newResponse.responderName,
+      senderRole: 'collaborator',
+      messageText: `Pitch: ${newResponse.pitchMessage}${newResponse.offeredRate ? ` (Terms: ${newResponse.offeredRate})` : ''}`,
+      timestamp: new Date().toISOString()
+    };
+
+    const updatedWithMsg: CollaborationRequest = {
+      ...respondingToRequest,
+      messages: [...(respondingToRequest.messages || []), initialMessage]
+    };
+    onUpdateRequest(updatedWithMsg);
+
     setRespondingToRequest(null);
     setResponderPitch('');
-    setResponderRate('');
-
-    setNotificationBanner(`Your proposal was submitted to ${respondingToRequest.authorArtistName}! They will receive your pitch and portfolio.`);
-    setTimeout(() => setNotificationBanner(null), 5000);
+    setNotificationBanner(`Your proposal has been submitted to ${respondingToRequest.authorArtistName}!`);
+    setTimeout(() => setNotificationBanner(null), 4000);
   };
 
   return (
-    <div className="space-y-6">
-      {/* Toast Notification */}
+    <div className="space-y-6" id="collaborate-marketplace-root">
+      {/* Top Banner Notice */}
       <AnimatePresence>
         {notificationBanner && (
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
+            initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="bg-emerald-950/90 border border-emerald-500/30 text-emerald-200 px-4 py-3 rounded-xl flex items-center justify-between shadow-xl shadow-black/40 backdrop-blur-md"
+            exit={{ opacity: 0, y: -10 }}
+            className="p-3.5 bg-gradient-to-r from-emerald-950/90 via-purple-950/80 to-slate-900 border border-emerald-500/40 rounded-xl text-xs text-emerald-200 flex items-center justify-between gap-3 shadow-lg shadow-emerald-950/20"
           >
-            <div className="flex items-center gap-3">
-              <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
-              <span className="text-xs font-semibold">{notificationBanner}</span>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+              <span>{notificationBanner}</span>
             </div>
-            <button 
+            <button
               onClick={() => setNotificationBanner(null)}
-              className="text-emerald-400 hover:text-white p-1 rounded cursor-pointer"
+              className="text-slate-400 hover:text-white cursor-pointer"
             >
               <X size={14} />
             </button>
@@ -408,58 +618,57 @@ export const CollaborateTab: React.FC<CollaborateTabProps> = ({
         )}
       </AnimatePresence>
 
-      {/* Top Marketplace Stats & Hero Banner */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-slate-900/80 border border-purple-500/20 rounded-2xl p-4 flex flex-col justify-between shadow-lg shadow-black/30">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold font-mono uppercase tracking-wider text-purple-400">Open Requests</span>
-            <span className="p-1.5 bg-purple-500/10 border border-purple-500/20 rounded-lg text-purple-300">
-              <Music size={14} />
-            </span>
-          </div>
-          <div className="mt-2">
-            <span className="text-2xl font-black font-mono text-white">{activeRequestsCount}</span>
-            <span className="text-[10px] text-slate-400 block mt-0.5">Musicians & Creatives sought</span>
-          </div>
-        </div>
-
-        <div className="bg-slate-900/80 border border-emerald-500/20 rounded-2xl p-4 flex flex-col justify-between shadow-lg shadow-black/30">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold font-mono uppercase tracking-wider text-emerald-400">Paid Opportunities</span>
-            <span className="p-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
-              <DollarSign size={14} />
-            </span>
-          </div>
-          <div className="mt-2">
-            <span className="text-2xl font-black font-mono text-emerald-400">
-              {requests.filter(r => r.compensationType.startsWith('paid')).length}
-            </span>
-            <span className="text-[10px] text-slate-400 block mt-0.5">Guaranteed payouts & gig fees</span>
-          </div>
-        </div>
-
-        <div className="bg-slate-900/80 border border-amber-500/20 rounded-2xl p-4 flex flex-col justify-between shadow-lg shadow-black/30">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold font-mono uppercase tracking-wider text-amber-400">My Band Postings</span>
-            <span className="p-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-300">
-              <Users size={14} />
-            </span>
-          </div>
-          <div className="mt-2">
-            <span className="text-2xl font-black font-mono text-amber-400">{myBandsRequests.length}</span>
-            <span className="text-[10px] text-slate-400 block mt-0.5">{totalResponsesReceived} musician response(s)</span>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-purple-900/40 via-indigo-900/20 to-slate-900 border border-purple-500/30 rounded-2xl p-4 flex flex-col justify-between shadow-lg shadow-purple-900/20">
+      {/* Hero Header & Quick Action Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Card 1: Artist-to-Artist Direct Co-Bill Proposer */}
+        <div className="bg-gradient-to-br from-pink-950/50 via-purple-950/30 to-slate-900 border border-pink-500/30 rounded-2xl p-4 flex flex-col justify-between shadow-lg shadow-pink-950/20">
           <div>
-            <span className="text-[10px] font-bold font-mono uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
-              <Sparkles size={12} className="text-purple-400" /> Sharon AI Matchmaker
-            </span>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold font-mono uppercase tracking-wider text-pink-300 flex items-center gap-1.5">
+                <Handshake size={14} className="text-pink-400" />
+                <span>Artist-to-Artist Proposer</span>
+              </span>
+              <span className="text-[9px] font-mono bg-pink-500/20 text-pink-200 px-2 py-0.5 rounded-full border border-pink-500/30">
+                Direct Co-Bills
+              </span>
+            </div>
+            <h4 className="text-sm font-bold text-white font-display mt-2">
+              Send Direct Co-Bill Proposal
+            </h4>
             <p className="text-[11px] text-slate-300 mt-1 leading-snug">
-              Need a sub drummer for Friday or a merch designer? Post a request in 30 seconds!
+              Invite another band to co-headline, share tour dates, or feature on a release. Linked automatically when accepted!
             </p>
           </div>
+
+          <button
+            onClick={() => setShowDirectCollabModal(true)}
+            className="mt-3 w-full py-2 px-3 bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-95 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-pink-600/30 transition-all cursor-pointer font-mono"
+          >
+            <Handshake size={14} />
+            <span>Propose Collaboration to Artist</span>
+          </button>
+        </div>
+
+        {/* Card 2: Open Marketplace Listings */}
+        <div className="bg-gradient-to-br from-purple-900/40 via-indigo-900/20 to-slate-900 border border-purple-500/30 rounded-2xl p-4 flex flex-col justify-between shadow-lg shadow-purple-900/20">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold font-mono uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
+                <Sparkles size={12} className="text-purple-400" />
+                <span>BandAide Marketplace</span>
+              </span>
+              <span className="text-[9px] font-mono bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full">
+                {activeRequestsCount} Open
+              </span>
+            </div>
+            <h4 className="text-sm font-bold text-white font-display mt-2">
+              Post Musician or Crew Wanted
+            </h4>
+            <p className="text-[11px] text-slate-300 mt-1 leading-snug">
+              Looking for a sub drummer, session bassist, sound engineer, or tour merch designer? Broadcast to the community.
+            </p>
+          </div>
+
           <button
             onClick={() => {
               if (selectedArtistId && selectedArtistId !== 'all') {
@@ -467,22 +676,56 @@ export const CollaborateTab: React.FC<CollaborateTabProps> = ({
               }
               setShowPostModal(true);
             }}
-            className="mt-3 w-full py-2 px-3 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-purple-600/30 transition-all cursor-pointer"
+            className="mt-3 w-full py-2 px-3 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-purple-600/30 transition-all cursor-pointer font-mono"
           >
-            <Plus size={14} /> Post Seeking Collaborator
+            <Plus size={14} />
+            <span>Post Seeking Collaborator</span>
+          </button>
+        </div>
+
+        {/* Card 3: In-App Collaborator Chat Inbox */}
+        <div className="bg-gradient-to-br from-cyan-950/40 via-slate-900 to-indigo-950/30 border border-cyan-500/30 rounded-2xl p-4 flex flex-col justify-between shadow-lg shadow-cyan-950/20">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold font-mono uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
+                <MessageSquare size={13} className="text-cyan-400" />
+                <span>Collaborator Messages</span>
+              </span>
+              <span className="text-[9px] font-mono bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full">
+                {totalConversationsCount} Threads
+              </span>
+            </div>
+            <h4 className="text-sm font-bold text-white font-display mt-2">
+              In-App Collaborator Inbox
+            </h4>
+            <p className="text-[11px] text-slate-300 mt-1 leading-snug">
+              Direct chat between artists, co-bill partners, and auditioning musicians with stage plots & call-time presets.
+            </p>
+          </div>
+
+          <button
+            onClick={() => setViewScope('messages')}
+            className={`mt-3 w-full py-2 px-3 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer font-mono ${
+              viewScope === 'messages'
+                ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/30'
+                : 'bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-800 hover:border-cyan-500/40'
+            }`}
+          >
+            <MessageSquare size={14} />
+            <span>Open In-App Messages</span>
           </button>
         </div>
       </div>
 
-      {/* Control Bar: Search, Category Pills, View Mode */}
+      {/* Control Bar: Search, Scope Tabs & Filters */}
       <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 space-y-4">
-        {/* Row 1: Search + Scope Tabs + Post Action */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-3">
-          <div className="relative w-full md:w-80">
+        {/* Row 1: Search + Scope Tabs */}
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-3">
+          <div className="relative w-full lg:w-72">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
             <input
               type="text"
-              placeholder="Search skill (e.g. drummer, designer, IEMs)..."
+              placeholder="Search band, role, or skill..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-slate-950 border border-slate-800 focus:border-purple-500 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none transition-all"
@@ -498,7 +741,7 @@ export const CollaborateTab: React.FC<CollaborateTabProps> = ({
           </div>
 
           {/* View Scope Toggle */}
-          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 w-full lg:w-auto">
             <button
               onClick={() => setViewScope('all')}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
@@ -509,6 +752,22 @@ export const CollaborateTab: React.FC<CollaborateTabProps> = ({
             >
               All Marketplace ({requests.length})
             </button>
+
+            <button
+              onClick={() => setViewScope('direct_collabs')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                viewScope === 'direct_collabs'
+                  ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Handshake size={12} />
+              <span>Direct Proposals</span>
+              <span className="text-[10px] bg-pink-950/60 px-1.5 py-0.2 rounded font-mono font-bold text-pink-300">
+                {directProposalsCount}
+              </span>
+            </button>
+
             <button
               onClick={() => setViewScope('my_posts')}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
@@ -522,28 +781,33 @@ export const CollaborateTab: React.FC<CollaborateTabProps> = ({
                 {myBandsRequests.length}
               </span>
             </button>
+
             <button
-              onClick={() => setViewScope('my_pitches')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                viewScope === 'my_pitches'
-                  ? 'bg-purple-600 text-white shadow-sm'
+              onClick={() => setViewScope('messages')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                viewScope === 'messages'
+                  ? 'bg-cyan-600 text-white shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              My Pitches
+              <MessageSquare size={12} />
+              <span>In-App Messages</span>
+              <span className="text-[10px] bg-cyan-950/60 px-1.5 py-0.2 rounded font-mono font-bold text-cyan-300">
+                {totalConversationsCount}
+              </span>
             </button>
           </div>
 
-          {/* Secondary Filters */}
-          <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+          {/* Location & Status Filters */}
+          <div className="flex items-center gap-2 w-full lg:w-auto justify-end">
             <select
-              value={locationFilter}
-              onChange={(e: any) => setLocationFilter(e.target.value)}
+              value={statusFilter}
+              onChange={(e: any) => setStatusFilter(e.target.value)}
               className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-xs text-slate-300 focus:outline-none cursor-pointer"
             >
-              <option value="all">Any Location</option>
-              <option value="remote">Remote / Stems Only</option>
-              <option value="in_person">In-Person Gig Only</option>
+              <option value="all">All Statuses</option>
+              <option value="open">Seeking / Open Only</option>
+              <option value="filled">Filled / Linked</option>
             </select>
 
             <select
@@ -551,132 +815,175 @@ export const CollaborateTab: React.FC<CollaborateTabProps> = ({
               onChange={(e: any) => setCompensationFilter(e.target.value)}
               className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-xs text-slate-300 focus:outline-none cursor-pointer"
             >
-              <option value="all">All Pay Types</option>
-              <option value="paid_fixed">Paid Flat Fee</option>
-              <option value="paid_hourly">Paid Hourly</option>
+              <option value="all">Any Terms</option>
               <option value="door_split">Door Split %</option>
-              <option value="trade_credit">Trade & Credit</option>
+              <option value="paid_fixed">Fixed Fee / Guarantee</option>
               <option value="volunteer">Volunteer / Jam</option>
             </select>
           </div>
         </div>
 
-        {/* Row 2: Category Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
-          {[
-            { id: 'all', label: 'All Roles', icon: Users },
-            { id: 'drummer', label: '🥁 Drummers', icon: Music },
-            { id: 'bassist', label: '🎸 Bassists', icon: Music },
-            { id: 'vocalist', label: '🎤 Vocalists', icon: Mic },
-            { id: 'graphic_designer', label: '🎨 Graphic & Posters', icon: Palette },
-            { id: 'sound_engineer', label: '🎚️ Sound (FOH)', icon: Sliders },
-            { id: 'videographer', label: '🎥 Video & Reels', icon: Video },
-            { id: 'keyboardist', label: '🎹 Keys & Synths', icon: Music },
-            { id: 'producer', label: '🎛️ Producers', icon: Sliders },
-            { id: 'tour_manager', label: '🚐 Tour Tech', icon: Briefcase },
-          ].map(cat => (
-            <button
-              key={cat.id}
-              onClick={() => setActiveCategory(cat.id)}
-              className={`px-3 py-1.5 rounded-xl whitespace-nowrap font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeCategory === cat.id
-                  ? 'bg-purple-600/30 text-purple-300 border border-purple-500/50 shadow-sm'
-                  : 'bg-slate-950/60 text-slate-400 hover:text-slate-200 border border-slate-800/80 hover:border-slate-700'
-              }`}
-            >
-              <span>{cat.label}</span>
-            </button>
-          ))}
-        </div>
+        {/* Row 2: Category Pills (if viewing all marketplace) */}
+        {viewScope === 'all' && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none pt-1 border-t border-slate-800/80">
+            <span className="text-[10px] font-mono text-slate-500 uppercase font-bold shrink-0">Filter:</span>
+            {[
+              { id: 'all', label: 'All Categories' },
+              { id: 'musicians', label: 'Musicians & Vocalists' },
+              { id: 'creative', label: 'Art, Photo & Video' },
+              { id: 'crew', label: 'Sound & Tour Crew' },
+            ].map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => setActiveCategory(cat.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
+                  activeCategory === cat.id
+                    ? 'bg-purple-600/30 text-purple-300 border border-purple-500/40'
+                    : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Marketplace Listings Feed */}
+      {/* Requests Grid */}
       {filteredRequests.length === 0 ? (
-        <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-12 text-center space-y-4">
-          <div className="w-16 h-16 bg-purple-500/10 border border-purple-500/20 rounded-2xl flex items-center justify-center mx-auto text-purple-400">
-            <Users size={32} />
-          </div>
-          <h3 className="text-lg font-bold text-slate-200">No collaboration requests match your filters</h3>
-          <p className="text-xs text-slate-400 max-w-md mx-auto">
-            Try adjusting your search criteria, clearing category filters, or be the first to post a seeking collaborator request for your band!
+        <div className="bg-slate-900/40 border border-slate-800 border-dashed rounded-2xl p-12 text-center text-slate-500 space-y-3">
+          <Handshake className="mx-auto text-slate-600" size={44} />
+          <h4 className="text-base font-bold text-slate-300">No collaboration requests found</h4>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">
+            {viewScope === 'direct_collabs'
+              ? 'No direct artist-to-artist proposals yet. Click "Propose Collaboration to Artist" to invite another band!'
+              : viewScope === 'messages'
+              ? 'No active conversation threads. Send an artist a proposal or apply to an open listing to start chatting!'
+              : 'Try clearing your search terms or post a new listing for your band.'}
           </p>
-          <button
-            onClick={() => {
-              setActiveCategory('all');
-              setSearchQuery('');
-              setLocationFilter('all');
-              setCompensationFilter('all');
-              setViewScope('all');
-            }}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold cursor-pointer"
-          >
-            Reset Filters
-          </button>
+          <div className="flex items-center justify-center gap-3 pt-2">
+            <button
+              onClick={() => setShowDirectCollabModal(true)}
+              className="px-4 py-2 bg-gradient-to-r from-pink-600 to-purple-600 text-white font-bold text-xs rounded-xl shadow-md cursor-pointer"
+            >
+              Propose Artist Co-Bill
+            </button>
+            <button
+              onClick={() => setShowPostModal(true)}
+              className="px-4 py-2 bg-purple-600 text-white font-bold text-xs rounded-xl shadow-md cursor-pointer"
+            >
+              Post Seeking Collaborator
+            </button>
+          </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredRequests.map(req => {
-            const roleInfo = ROLE_OPTIONS.find(r => r.value === req.roleNeeded) || ROLE_OPTIONS[0];
-            const RoleIcon = roleInfo.icon;
+            const roleConfig = ROLE_OPTIONS.find(r => r.value === req.roleNeeded) || ROLE_OPTIONS[ROLE_OPTIONS.length - 1];
+            const RoleIcon = roleConfig.icon;
             const isMyPost = artists.some(a => a.id === req.authorArtistId);
+            const isTargetedToMe = req.targetArtistId && artists.some(a => a.id === req.targetArtistId);
             const responsesCount = req.responses?.length || 0;
+            const messagesCount = req.messages?.length || 0;
             const isFilled = req.status === 'filled';
+            const isLinked = isFilled && Boolean(req.acceptedCollaboratorName);
 
             return (
               <motion.div
                 key={req.id}
                 layout
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`bg-slate-900/90 border rounded-2xl p-5 flex flex-col justify-between transition-all shadow-md shadow-black/20 ${
-                  isFilled 
-                    ? 'border-slate-800/80 opacity-60' 
-                    : isMyPost 
-                      ? 'border-purple-500/40 bg-purple-950/10' 
-                      : 'border-slate-800 hover:border-purple-500/30'
+                className={`bg-slate-900/70 border rounded-2xl p-5 flex flex-col justify-between transition-all hover:shadow-xl ${
+                  req.isDirectArtistCollab
+                    ? 'border-pink-500/40 bg-gradient-to-b from-pink-950/20 to-slate-900/80 shadow-pink-950/10'
+                    : isFilled
+                    ? 'border-emerald-500/30 bg-slate-900/40'
+                    : 'border-slate-800 hover:border-purple-500/40'
                 }`}
               >
-                {/* Header: Author + Role Pill + Compensation Badge */}
                 <div>
-                  <div className="flex items-start justify-between gap-3 mb-2.5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-sm text-purple-400 font-mono shrink-0">
-                        {req.authorArtistName.slice(0, 2).toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-white">{req.authorArtistName}</span>
-                          {isMyPost && (
-                            <span className="text-[9px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-1.5 py-0.2 rounded font-mono font-bold">
-                              YOUR POST
+                  {/* Top Badges */}
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    {/* Role / Direct Collab Tag */}
+                    <div className="flex flex-wrap gap-1.5 items-center">
+                      {req.isDirectArtistCollab ? (
+                        <span className="inline-flex items-center gap-1 bg-gradient-to-r from-pink-500/20 to-purple-500/20 text-pink-300 border border-pink-500/40 text-[10px] font-bold font-mono px-2 py-0.5 rounded-full">
+                          <Handshake size={11} />
+                          <span>Direct Co-Bill Proposal</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 bg-purple-500/10 text-purple-300 border border-purple-500/30 text-[10px] font-bold font-mono px-2 py-0.5 rounded-full">
+                          <RoleIcon size={11} />
+                          <span>{roleConfig.label}</span>
+                        </span>
+                      )}
+
+                      {isLinked && (
+                        <span className="inline-flex items-center gap-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold font-mono px-2 py-0.5 rounded-full">
+                          <CheckCircle2 size={10} />
+                          <span>Profiles & Event Linked</span>
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Messages pill button */}
+                    <button
+                      onClick={() => setActiveMessagingRequest(req)}
+                      className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg flex items-center gap-1 cursor-pointer transition-all ${
+                        messagesCount > 0
+                          ? 'bg-cyan-950/80 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-900'
+                          : 'bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200'
+                      }`}
+                      title="Open In-App Collaborator Chat"
+                    >
+                      <MessageSquare size={11} className={messagesCount > 0 ? 'text-cyan-400' : 'text-slate-500'} />
+                      <span>{messagesCount > 0 ? `${messagesCount} msgs` : 'Chat'}</span>
+                    </button>
+                  </div>
+
+                  {/* Title & Artist Identity */}
+                  <h4 className="text-sm font-bold text-white font-display mb-1 leading-snug">
+                    {req.title}
+                  </h4>
+
+                  <div className="text-[11px] text-slate-400 mb-3 space-y-0.5">
+                    <p className="flex items-center gap-1.5">
+                      <span className="text-slate-500">Initiated by:</span>
+                      <strong className="text-purple-300">{req.authorArtistName}</strong>
+                      {req.authorGenre && <span className="text-[10px] font-mono text-slate-500">({req.authorGenre})</span>}
+                    </p>
+
+                    {req.targetArtistName && (
+                      <p className="flex items-center gap-1.5 text-pink-300">
+                        <span className="text-slate-500">Target Partner:</span>
+                        <strong>{req.targetArtistName}</strong>
+                      </p>
+                    )}
+
+                    {req.acceptedCollaboratorName && (
+                      <p className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                        <Link2 size={11} />
+                        <span>Connected: {req.acceptedCollaboratorName}</span>
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Linked Gig Info if attached */}
+                  {req.gigTitle && (
+                    <div className="mb-3 p-2 rounded-xl bg-purple-950/30 border border-purple-500/20 text-xs flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Calendar size={13} className="text-purple-400 shrink-0" />
+                        <div>
+                          <span className="font-bold text-slate-200 block text-[11px]">{req.gigTitle}</span>
+                          {req.eventDate && (
+                            <span className="text-[10px] font-mono text-purple-300">
+                              {new Date(req.eventDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
                             </span>
                           )}
                         </div>
-                        <span className="text-[11px] text-slate-400 flex items-center gap-1.5">
-                          {req.authorGenre && <span>{req.authorGenre} • </span>}
-                          <span>Posted {new Date(req.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
-                        </span>
                       </div>
-                    </div>
-
-                    {/* Role Pill */}
-                    <span className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl bg-purple-500/10 text-purple-300 border border-purple-500/20 shrink-0">
-                      <RoleIcon size={13} />
-                      <span>{roleInfo.label}</span>
-                    </span>
-                  </div>
-
-                  {/* Title */}
-                  <h3 className="text-base font-bold text-slate-100 group-hover:text-purple-300 transition-colors mb-2">
-                    {req.title}
-                  </h3>
-
-                  {/* Associated Gig Tag if available */}
-                  {req.gigTitle && (
-                    <div className="mb-2.5 inline-flex items-center gap-1.5 text-[11px] bg-slate-800/80 border border-slate-700 text-slate-300 px-2.5 py-0.5 rounded-lg">
-                      <Calendar size={12} className="text-amber-400" />
-                      <span>For Show: <strong className="text-white">{req.gigTitle}</strong></span>
-                      {req.eventDate && <span className="text-slate-400">({new Date(req.eventDate).toLocaleDateString([], { month: 'short', day: 'numeric' })})</span>}
+                      <span className="text-[9.5px] font-mono bg-purple-900/60 text-purple-200 px-1.5 py-0.5 rounded">
+                        Co-Bill Show
+                      </span>
                     </div>
                   )}
 
@@ -702,7 +1009,7 @@ export const CollaborateTab: React.FC<CollaborateTabProps> = ({
                 {/* Footer Details & Action Buttons */}
                 <div className="pt-3 border-t border-slate-800/80 space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                    {/* Location & Remote */}
+                    {/* Location */}
                     <div className="flex items-center gap-1.5 text-slate-400">
                       {req.isRemote ? (
                         <>
@@ -712,77 +1019,78 @@ export const CollaborateTab: React.FC<CollaborateTabProps> = ({
                       ) : (
                         <>
                           <MapPin size={13} className="text-slate-500" />
-                          <span>{req.location}</span>
+                          <span className="truncate max-w-[140px]">{req.location}</span>
                         </>
                       )}
                     </div>
 
                     {/* Compensation */}
-                    <div className="flex items-center gap-1 font-semibold text-emerald-400 font-mono">
-                      <DollarSign size={13} />
+                    <div className="flex items-center gap-1 font-semibold text-emerald-400 font-mono text-[11px]">
+                      <DollarSign size={12} />
                       <span>{req.compensationAmount || 'Negotiable'}</span>
                     </div>
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center justify-between gap-2 pt-1">
                     {/* Status Badge */}
                     <div className="text-[11px] font-mono">
                       {isFilled ? (
-                        <span className="text-slate-500 bg-slate-800/80 px-2 py-0.5 rounded">ROLE FILLED</span>
+                        <span className="text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded text-[10px] font-bold">
+                          LINKED & FILLED
+                        </span>
                       ) : req.status === 'in_discussion' ? (
-                        <span className="text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">IN DISCUSSION</span>
+                        <span className="text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 text-[10px] font-bold">
+                          IN DISCUSSION
+                        </span>
                       ) : (
-                        <span className="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">SEEKING NOW</span>
+                        <span className="text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20 text-[10px] font-bold">
+                          OPEN PROPOSAL
+                        </span>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      {isMyPost ? (
-                        <>
-                          {/* Manage responses button */}
-                          <button
-                            onClick={() => setManagingRequest(req)}
-                            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
-                          >
-                            <Eye size={13} />
-                            <span>Responses</span>
-                            <span className="bg-purple-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full font-mono">
-                              {responsesCount}
-                            </span>
-                          </button>
+                    <div className="flex items-center gap-1.5">
+                      {/* Chat Drawer Launcher */}
+                      <button
+                        onClick={() => setActiveMessagingRequest(req)}
+                        className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer border border-slate-700"
+                        title="Chat in-app"
+                      >
+                        <MessageSquare size={12} />
+                        <span>Chat</span>
+                      </button>
 
-                          {/* Delete request */}
-                          <button
-                            onClick={() => {
-                              if (window.confirm(`Delete request "${req.title}"?`)) {
-                                onDeleteRequest(req.id);
-                              }
-                            }}
-                            className="p-1.5 bg-slate-900 hover:bg-red-950 text-slate-500 hover:text-red-400 border border-slate-800 rounded-xl transition-all cursor-pointer"
-                            title="Delete Request"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </>
-                      ) : (
+                      {/* If Targeted directly to me and still open, offer direct Accept & Link */}
+                      {isTargetedToMe && !isFilled && (
                         <button
-                          onClick={() => {
-                            setRespondingToRequest(req);
-                            if (defaultArtist) {
-                              setResponderName(defaultArtist.name);
-                              setResponderEmail(defaultArtist.contactEmail || '');
-                            }
-                          }}
-                          disabled={isFilled}
-                          className={`px-4 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                            isFilled
-                              ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                              : 'bg-purple-600 hover:bg-purple-500 text-white shadow-md shadow-purple-600/30'
-                          }`}
+                          onClick={() => handleAcceptCollaborationAndLink(req, activeArtist.id, activeArtist.name)}
+                          className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 text-white rounded-xl text-xs font-bold font-mono flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-600/30"
                         >
-                          <Send size={13} />
-                          <span>Respond & Pitch</span>
+                          <Check size={13} />
+                          <span>Accept & Link</span>
+                        </button>
+                      )}
+
+                      {/* If My Post: Manage Responses */}
+                      {isMyPost && !isTargetedToMe && (
+                        <button
+                          onClick={() => setManagingRequest(req)}
+                          className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                        >
+                          <Eye size={13} />
+                          <span>Responses ({responsesCount})</span>
+                        </button>
+                      )}
+
+                      {/* If not my post and not already responded: Pitch / Apply */}
+                      {!isMyPost && !isTargetedToMe && !isFilled && (
+                        <button
+                          onClick={() => setRespondingToRequest(req)}
+                          className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm shadow-purple-600/20"
+                        >
+                          <Send size={12} />
+                          <span>Pitch / Join</span>
                         </button>
                       )}
                     </div>
@@ -794,49 +1102,49 @@ export const CollaborateTab: React.FC<CollaborateTabProps> = ({
         </div>
       )}
 
-      {/* ======================================================== */}
-      {/* MODAL 1: POST SEEKING COLLABORATOR REQUEST              */}
-      {/* ======================================================== */}
+      {/* MODAL 1: PROPOSE DIRECT ARTIST-TO-ARTIST COLLABORATION */}
       <AnimatePresence>
-        {showPostModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+        {showDirectCollabModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-slate-900 border border-purple-500/30 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl my-8"
+              className="bg-slate-900 border border-pink-500/40 rounded-2xl max-w-xl w-full p-6 max-h-[90vh] overflow-y-auto space-y-4 shadow-2xl"
             >
-              {/* Header */}
-              <div className="p-5 bg-slate-950 border-b border-purple-500/20 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-purple-600/20 text-purple-400 rounded-xl border border-purple-500/30">
-                    <Users size={20} />
+              <div className="flex items-center justify-between border-b border-pink-500/20 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-pink-600 to-purple-600 flex items-center justify-center text-white shadow-md">
+                    <Handshake size={18} />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-white">Post Seeking Collaborator Request</h3>
-                    <p className="text-xs text-slate-400">Reach drummers, graphic designers, sound engineers, or session musicians.</p>
+                    <h3 className="text-base font-bold text-white font-display">
+                      Propose Artist Collaboration or Co-Bill
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Send a proposal directly to another band. If accepted, profiles and events are automatically linked!
+                    </p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setShowPostModal(false)}
-                  className="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer"
+                <button 
+                  onClick={() => setShowDirectCollabModal(false)}
+                  className="text-slate-400 hover:text-white"
                 >
                   <X size={18} />
                 </button>
               </div>
 
-              {/* Form Body */}
-              <form onSubmit={handleSubmitPost} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-                {/* Band / Poster & Role */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <form onSubmit={handleSubmitDirectProposal} className="space-y-4">
+                {/* Sender & Recipient Pickers */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      Posting Artist / Band <span className="text-purple-400">*</span>
+                    <label className="block text-[11px] font-mono text-slate-300 font-bold mb-1">
+                      From Your Band:
                     </label>
                     <select
-                      value={authorArtistId}
-                      onChange={(e) => setAuthorArtistId(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                      value={directSenderId}
+                      onChange={(e) => setDirectSenderId(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
                     >
                       {artists.map(a => (
                         <option key={a.id} value={a.id}>{a.name} ({a.genre})</option>
@@ -845,138 +1153,444 @@ export const CollaborateTab: React.FC<CollaborateTabProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      Collaborator Role Needed <span className="text-purple-400">*</span>
+                    <label className="block text-[11px] font-mono text-pink-300 font-bold mb-1">
+                      To Partner Band: *
                     </label>
                     <select
-                      value={postRole}
-                      onChange={(e) => {
-                        const newRole = e.target.value as CollaboratorRole;
-                        setPostRole(newRole);
-                        // Suggest default skills for role
-                        if (SUGGESTED_SKILL_TAGS[newRole]) {
-                          setPostSkills(SUGGESTED_SKILL_TAGS[newRole].slice(0, 3));
-                        }
-                      }}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                      value={directTargetId}
+                      onChange={(e) => setDirectTargetId(e.target.value)}
+                      required
+                      className="w-full bg-slate-950 border border-pink-500/40 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
                     >
-                      {ROLE_OPTIONS.map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      <option value="">Select an Artist to invite...</option>
+                      {artists.filter(a => a.id !== directSenderId).map(a => (
+                        <option key={a.id} value={a.id}>{a.name} ({a.genre})</option>
                       ))}
                     </select>
                   </div>
                 </div>
 
-                {/* Headline / Title */}
+                {/* Collaboration Type */}
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-slate-300">
-                      Request Headline / Title <span className="text-purple-400">*</span>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={handleAiDraftPost}
-                      disabled={isAiDraftingPost}
-                      className="text-[11px] text-purple-300 hover:text-purple-200 font-semibold flex items-center gap-1 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 px-2 py-0.5 rounded-lg transition-all cursor-pointer"
-                    >
-                      <Sparkles size={11} className={isAiDraftingPost ? 'animate-spin' : ''} />
-                      <span>{isAiDraftingPost ? 'Sharon Writing...' : '✨ Let Sharon Draft Post'}</span>
-                    </button>
+                  <label className="block text-[11px] font-mono text-slate-300 font-bold mb-1.5">
+                    Collaboration Project Type:
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { id: 'co_bill_show', label: 'Co-Bill Show', icon: Calendar },
+                      { id: 'tour_support', label: 'Tour Support', icon: Briefcase },
+                      { id: 'split_single', label: 'Split Single', icon: Music },
+                      { id: 'guest_musician', label: 'Guest Feature', icon: Users },
+                    ].map(type => (
+                      <button
+                        key={type.id}
+                        type="button"
+                        onClick={() => setDirectCollabType(type.id as any)}
+                        className={`p-2 rounded-xl text-xs font-mono font-bold flex flex-col items-center gap-1 border transition-all cursor-pointer ${
+                          directCollabType === type.id
+                            ? 'bg-pink-600 text-white border-pink-400 shadow-md shadow-pink-600/30'
+                            : 'bg-slate-950 text-slate-400 hover:text-slate-200 border-slate-800'
+                        }`}
+                      >
+                        <type.icon size={14} />
+                        <span>{type.label}</span>
+                      </button>
+                    ))}
                   </div>
+                </div>
+
+                {/* Proposal Title */}
+                <div>
+                  <label className="block text-[11px] font-mono text-slate-300 font-bold mb-1">
+                    Project / Show Title:
+                  </label>
                   <input
                     type="text"
-                    required
-                    placeholder="e.g. Drummer needed for RINO Room gig, or Graphic designer for tour poster"
-                    value={postTitle}
-                    onChange={(e) => setPostTitle(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                    value={directTitle}
+                    onChange={(e) => setDirectTitle(e.target.value)}
+                    placeholder="e.g. Co-bill show at The Sunset Tavern or Pacific NW Split Tour"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-pink-500 focus:outline-none"
                   />
                 </div>
 
-                {/* Link to Existing Gig (Optional) */}
+                {/* Link to an existing gig on sender calendar */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Associate with Scheduled Gig (Optional)
+                  <label className="block text-[11px] font-mono text-slate-300 font-bold mb-1 flex items-center justify-between">
+                    <span>Link an Existing Gig to Synchronize:</span>
+                    <span className="text-[10px] text-purple-300">Optional</span>
                   </label>
                   <select
-                    value={postGigId}
-                    onChange={(e) => handleSelectGigForPost(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                    value={directGigId}
+                    onChange={(e) => setDirectGigId(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
                   >
-                    <option value="">-- No specific gig (General Studio / Tour / Brand) --</option>
+                    <option value="">No existing gig (Enter new date below)</option>
                     {gigs.map(g => (
                       <option key={g.id} value={g.id}>
-                        {g.title} • {g.venueName} ({new Date(g.dateTime).toLocaleDateString([], { month: 'short', day: 'numeric' })})
+                        {g.title} • {g.venueName} ({new Date(g.dateTime).toLocaleDateString()})
                       </option>
                     ))}
                   </select>
                 </div>
 
-                {/* Description */}
+                {!directGigId && (
+                  <div>
+                    <label className="block text-[11px] font-mono text-slate-300 font-bold mb-1">
+                      Proposed Event Date / Target Timeline:
+                    </label>
+                    <input
+                      type="date"
+                      value={directCustomDate}
+                      onChange={(e) => setDirectCustomDate(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none font-mono"
+                    />
+                  </div>
+                )}
+
+                {/* Compensation / Door Split */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-mono text-slate-300 font-bold mb-1">
+                      Revenue Terms:
+                    </label>
+                    <select
+                      value={directCompensationType}
+                      onChange={(e) => setDirectCompensationType(e.target.value as any)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                    >
+                      <option value="door_split">Equal Door Split % (e.g. 50/50)</option>
+                      <option value="paid_fixed">Fixed Guarantee Payout ($)</option>
+                      <option value="trade_credit">Merch / Support Trade</option>
+                      <option value="volunteer">Guest Jam / Pro Bono</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-mono text-slate-300 font-bold mb-1">
+                      Specific Split / Amount:
+                    </label>
+                    <input
+                      type="text"
+                      value={directCompensationAmount}
+                      onChange={(e) => setDirectCompensationAmount(e.target.value)}
+                      placeholder="e.g. 50% gross door split or $250 guarantee"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Proposal Message */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Scope of Work & Expectations <span className="text-purple-400">*</span>
+                  <label className="block text-[11px] font-mono text-slate-300 font-bold mb-1">
+                    Proposal Message / Notes to Partner:
                   </label>
                   <textarea
-                    required
-                    rows={4}
-                    placeholder="Explain the role, set length, rehearsal schedule, gear requirements, deliverables, or vibe..."
-                    value={postDescription}
-                    onChange={(e) => setPostDescription(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 leading-relaxed"
+                    rows={3}
+                    value={directPitchMessage}
+                    onChange={(e) => setDirectPitchMessage(e.target.value)}
+                    placeholder="Hey! We love your sound and think our fans would have huge crossover. Would love to team up on this show, share backline, and do a 50/50 split!"
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-pink-500 rounded-xl p-3 text-xs text-white focus:outline-none"
                   />
                 </div>
 
-                {/* Required Skills & Tags */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Specific Skills Required (Click to add or type custom)
-                  </label>
-                  
-                  {/* Active Skill Chips */}
-                  <div className="flex flex-wrap gap-1.5 mb-2">
-                    {postSkills.map(skill => (
-                      <span
-                        key={skill}
-                        className="bg-purple-600/30 text-purple-200 border border-purple-500/40 text-[11px] px-2.5 py-1 rounded-lg flex items-center gap-1.5 font-medium"
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setShowDirectCollabModal(false)}
+                    className="px-4 py-2 text-xs text-slate-400 hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-95 text-white font-bold text-xs font-mono rounded-xl shadow-lg shadow-pink-600/30 flex items-center gap-2 cursor-pointer"
+                  >
+                    <Send size={13} />
+                    <span>Send Collaboration Proposal</span>
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL 2: IN-APP COLLABORATOR MESSENGER DRAWER */}
+      <AnimatePresence>
+        {activeMessagingRequest && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-slate-900 border border-cyan-500/40 rounded-2xl max-w-2xl w-full h-[85vh] flex flex-col justify-between overflow-hidden shadow-2xl"
+            >
+              {/* Chat Header */}
+              <div className="bg-slate-950 border-b border-cyan-500/20 p-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-indigo-600 flex items-center justify-center text-white shadow-md">
+                    <MessageSquare size={18} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-white text-sm font-display truncate max-w-sm">
+                        {activeMessagingRequest.title}
+                      </h4>
+                      {activeMessagingRequest.status === 'filled' && (
+                        <span className="text-[9px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-1.5 py-0.2 rounded-full font-bold">
+                          LINKED
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-400 font-mono">
+                      {activeMessagingRequest.authorArtistName}
+                      {activeMessagingRequest.targetArtistName && ` ↔ ${activeMessagingRequest.targetArtistName}`}
+                      {activeMessagingRequest.acceptedCollaboratorName && ` ↔ ${activeMessagingRequest.acceptedCollaboratorName}`}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {/* If not filled and target artist is viewing, offer Accept & Link directly inside Chat */}
+                  {activeMessagingRequest.status !== 'filled' && activeMessagingRequest.targetArtistId === activeArtist.id && (
+                    <button
+                      onClick={() => handleAcceptCollaborationAndLink(activeMessagingRequest, activeArtist.id, activeArtist.name)}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-mono font-bold flex items-center gap-1 shadow-sm"
+                    >
+                      <Check size={12} />
+                      <span>Accept & Link</span>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => setActiveMessagingRequest(null)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Chat Message Scrollable Feed */}
+              <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-900/60">
+                {(!activeMessagingRequest.messages || activeMessagingRequest.messages.length === 0) ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center text-slate-500 space-y-2 p-6">
+                    <MessageSquare size={32} className="text-slate-700" />
+                    <p className="text-xs text-slate-400 font-bold">No messages in this collaboration yet.</p>
+                    <p className="text-[11px] text-slate-600 max-w-sm">
+                      Send a message below or use quick logistic chips to exchange soundcheck times, stage plots, or door splits!
+                    </p>
+                  </div>
+                ) : (
+                  activeMessagingRequest.messages.map((msg) => {
+                    const isSystem = msg.senderRole === 'system';
+                    const isMe = msg.senderArtistId === activeArtist.id || msg.senderName === activeArtist.name;
+
+                    if (isSystem) {
+                      return (
+                        <div key={msg.id} className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-200 text-xs text-center my-2 font-mono flex items-center justify-center gap-1.5">
+                          <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
+                          <span>{msg.messageText}</span>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={msg.id}
+                        className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} space-y-1`}
                       >
-                        <span>{skill}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveSkillTag(skill)}
-                          className="hover:text-red-400 cursor-pointer"
+                        <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-400 px-1">
+                          <strong className={isMe ? 'text-purple-300' : 'text-cyan-300'}>{msg.senderName}</strong>
+                          <span>•</span>
+                          <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+
+                        <div
+                          className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs leading-relaxed ${
+                            isMe
+                              ? 'bg-purple-600 text-white rounded-br-xs shadow-md shadow-purple-600/10'
+                              : 'bg-slate-950 border border-slate-800 text-slate-200 rounded-bl-xs'
+                          }`}
                         >
+                          <p className="whitespace-pre-wrap font-sans">{msg.messageText}</p>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Quick Logistic Presets Bar */}
+              <div className="px-4 py-2 bg-slate-950/80 border-t border-slate-850 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+                <span className="text-[10px] font-mono text-slate-500 uppercase font-bold shrink-0">Quick Chips:</span>
+                {[
+                  '📋 Sent our 12-channel stage plot!',
+                  '⏰ Soundcheck at 5:30 PM confirmed.',
+                  '💰 50/50 door split confirmed!',
+                  '🎵 Stems & transition notes shared in drive.'
+                ].map((chip, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleSendMessage(activeMessagingRequest, chip)}
+                    className="text-[10.5px] font-mono text-slate-300 hover:text-white bg-slate-900 hover:bg-purple-900/40 border border-slate-800 hover:border-purple-500/30 px-2 py-1 rounded-lg shrink-0 transition-colors cursor-pointer"
+                  >
+                    {chip}
+                  </button>
+                ))}
+              </div>
+
+              {/* Chat Input Box */}
+              <div className="p-3 bg-slate-950 border-t border-slate-800">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSendMessage(activeMessagingRequest);
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <input
+                    type="text"
+                    value={chatDraftText}
+                    onChange={(e) => setChatDraftText(e.target.value)}
+                    placeholder={`Message ${activeMessagingRequest.authorArtistName === activeArtist.name ? (activeMessagingRequest.targetArtistName || 'collaborator') : activeMessagingRequest.authorArtistName}...`}
+                    className="flex-1 bg-slate-900 border border-slate-800 focus:border-cyan-500 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none font-sans"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!chatDraftText.trim()}
+                    className="px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer shadow-md shadow-cyan-600/20"
+                  >
+                    <span>Send</span>
+                    <Send size={12} />
+                  </button>
+                </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL 3: POST SEEKING COLLABORATOR (OPEN MARKETPLACE LISTING) */}
+      <AnimatePresence>
+        {showPostModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-slate-900 border border-purple-500/40 rounded-2xl max-w-xl w-full p-6 max-h-[90vh] overflow-y-auto space-y-4 shadow-2xl"
+            >
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-purple-600 flex items-center justify-center text-white">
+                    <Plus size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white font-display">
+                      Post Seeking Collaborator Listing
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Broadcast open talent searches to local musicians, designers, and crew.
+                    </p>
+                  </div>
+                </div>
+                <button onClick={() => setShowPostModal(false)} className="text-slate-400 hover:text-white">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmitPost} className="space-y-4">
+                {/* Author Band Picker */}
+                <div>
+                  <label className="block text-[11px] font-mono text-slate-300 font-bold mb-1">
+                    Posting on Behalf Of:
+                  </label>
+                  <select
+                    value={authorArtistId}
+                    onChange={(e) => setAuthorArtistId(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                  >
+                    {artists.map(a => (
+                      <option key={a.id} value={a.id}>{a.name} ({a.genre})</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Role Picker */}
+                <div>
+                  <label className="block text-[11px] font-mono text-slate-300 font-bold mb-1">
+                    Role Needed: *
+                  </label>
+                  <select
+                    value={postRole}
+                    onChange={(e) => {
+                      const newRole = e.target.value as CollaboratorRole;
+                      setPostRole(newRole);
+                      setPostSkills(SUGGESTED_SKILL_TAGS[newRole]?.slice(0, 3) || ['Reliable Transport']);
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                  >
+                    {ROLE_OPTIONS.map(r => (
+                      <option key={r.value} value={r.value}>{r.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Title */}
+                <div>
+                  <label className="block text-[11px] font-mono text-slate-300 font-bold mb-1">
+                    Listing Title: *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={postTitle}
+                    onChange={(e) => setPostTitle(e.target.value)}
+                    placeholder="e.g. Sub drummer needed for RINO Room show or Merch Screenprint Designer"
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-purple-500 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                  />
+                </div>
+
+                {/* Link to existing gig */}
+                <div>
+                  <label className="block text-[11px] font-mono text-slate-300 font-bold mb-1">
+                    Attach to Upcoming Tour Date:
+                  </label>
+                  <select
+                    value={postGigId}
+                    onChange={(e) => handleSelectGigForPost(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                  >
+                    <option value="">No gig attached (General Search)</option>
+                    {gigs.map(g => (
+                      <option key={g.id} value={g.id}>
+                        {g.title} • {g.venueName} ({new Date(g.dateTime).toLocaleDateString()})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Skills Chips Picker */}
+                <div>
+                  <label className="block text-[11px] font-mono text-slate-300 font-bold mb-1">
+                    Key Skills / Requirements:
+                  </label>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {postSkills.map((sk, idx) => (
+                      <span key={idx} className="bg-purple-950/60 border border-purple-500/40 text-purple-300 px-2 py-0.5 rounded-lg text-xs font-mono flex items-center gap-1">
+                        <span>{sk}</span>
+                        <button type="button" onClick={() => handleRemoveSkillTag(sk)} className="hover:text-white">
                           <X size={11} />
                         </button>
                       </span>
                     ))}
                   </div>
 
-                  {/* Suggested tags for selected role */}
-                  <div className="flex flex-wrap gap-1 mb-2">
-                    <span className="text-[10px] text-slate-500 py-0.5">Suggestions:</span>
-                    {(SUGGESTED_SKILL_TAGS[postRole] || []).map(sug => (
-                      <button
-                        key={sug}
-                        type="button"
-                        onClick={() => handleAddSkillTag(sug)}
-                        className={`text-[10px] px-2 py-0.5 rounded border transition-all cursor-pointer ${
-                          postSkills.includes(sug)
-                            ? 'bg-slate-800 text-slate-500 border-slate-800 opacity-50 cursor-default'
-                            : 'bg-slate-950 text-slate-400 hover:text-white border-slate-800 hover:border-slate-700'
-                        }`}
-                        disabled={postSkills.includes(sug)}
-                      >
-                        + {sug}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Custom tag input */}
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-2">
                     <input
                       type="text"
-                      placeholder="Add custom skill (e.g. Pro Tools, 4-Track Stems, Behringer X32)..."
                       value={customSkillInput}
                       onChange={(e) => setCustomSkillInput(e.target.value)}
                       onKeyDown={(e) => {
@@ -985,121 +1599,84 @@ export const CollaborateTab: React.FC<CollaborateTabProps> = ({
                           handleAddSkillTag(customSkillInput);
                         }
                       }}
-                      className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                      placeholder="Add custom tag (e.g. Double Kick, IEMs)..."
+                      className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none"
                     />
                     <button
                       type="button"
                       onClick={() => handleAddSkillTag(customSkillInput)}
-                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl cursor-pointer"
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs rounded-lg font-mono"
                     >
-                      Add
+                      Add Tag
                     </button>
                   </div>
                 </div>
 
-                {/* Location & Remote */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      Location (City, Venue, or Area)
+                {/* Description + Sharon AI Draft Button */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-mono text-slate-300 font-bold">
+                      Project Description & Expectations: *
                     </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Seattle, WA or Denver, CO"
-                      value={postLocation}
-                      onChange={(e) => setPostLocation(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
-                    />
+                    <button
+                      type="button"
+                      onClick={handleAiDraftPost}
+                      disabled={isAiDraftingPost}
+                      className="text-[10.5px] font-mono text-purple-400 hover:text-purple-300 flex items-center gap-1 cursor-pointer"
+                    >
+                      <Sparkles size={11} />
+                      <span>{isAiDraftingPost ? 'Sharon is drafting...' : 'Draft with Sharon AI'}</span>
+                    </button>
                   </div>
-
-                  <div className="flex items-center gap-3 pt-6">
-                    <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={postIsRemote}
-                        onChange={(e) => setPostIsRemote(e.target.checked)}
-                        className="w-4 h-4 rounded bg-slate-950 border-slate-800 text-purple-600 focus:ring-purple-500"
-                      />
-                      <span>Remote / Digital Deliverable (No travel needed)</span>
-                    </label>
-                  </div>
+                  <textarea
+                    rows={4}
+                    required
+                    value={postDescription}
+                    onChange={(e) => setPostDescription(e.target.value)}
+                    placeholder="Describe the commitment, rehearsals, song repertoire, load-in requirements, and vibe..."
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-purple-500 rounded-xl p-3 text-xs text-white focus:outline-none"
+                  />
                 </div>
 
-                {/* Compensation Type & Amount */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Compensation & Location */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      Compensation Model <span className="text-purple-400">*</span>
+                    <label className="block text-[11px] font-mono text-slate-300 font-bold mb-1">
+                      Compensation Type:
                     </label>
                     <select
                       value={postCompensationType}
-                      onChange={(e: any) => setPostCompensationType(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                      onChange={(e) => setPostCompensationType(e.target.value as any)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
                     >
-                      <option value="paid_fixed">Paid Flat Fee ($)</option>
-                      <option value="paid_hourly">Paid Hourly Rate ($/hr)</option>
-                      <option value="door_split">Door / Ticket Split (%)</option>
-                      <option value="trade_credit">Trade, Merch & Songwriting Credit</option>
-                      <option value="volunteer">Volunteer / Audition / Jam</option>
+                      <option value="paid_fixed">Fixed Fee / Guarantee ($)</option>
+                      <option value="door_split">Door Split %</option>
+                      <option value="paid_hourly">Hourly Rate ($/hr)</option>
+                      <option value="trade_credit">Merch / Portfolio Trade</option>
+                      <option value="volunteer">Volunteer / Jam</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      Compensation Details / Amount <span className="text-purple-400">*</span>
+                    <label className="block text-[11px] font-mono text-slate-300 font-bold mb-1">
+                      Amount / Details:
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. $250 flat fee + drink tab, or $35/hr"
                       value={postCompensationAmount}
                       onChange={(e) => setPostCompensationAmount(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                      placeholder="e.g. $250 flat fee or 20% door cut"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
                     />
                   </div>
                 </div>
 
-                {/* Dates & Deadlines */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      Show or Deliverable Date
-                    </label>
-                    <input
-                      type="date"
-                      value={postEventDate}
-                      onChange={(e) => setPostEventDate(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      Application Deadline
-                    </label>
-                    <input
-                      type="date"
-                      value={postDeadline}
-                      onChange={(e) => setPostDeadline(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Submit Buttons */}
-                <div className="pt-4 border-t border-slate-800 flex items-center justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowPostModal(false)}
-                    className="px-4 py-2 text-xs text-slate-400 hover:text-white rounded-xl cursor-pointer"
-                  >
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                  <button type="button" onClick={() => setShowPostModal(false)} className="px-4 py-2 text-xs text-slate-400 hover:text-white">
                     Cancel
                   </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-purple-600/30 flex items-center gap-1.5 transition-all cursor-pointer"
-                  >
-                    <Check size={14} />
-                    <span>Publish Request</span>
+                  <button type="submit" className="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs font-mono rounded-xl shadow-lg shadow-purple-600/30 cursor-pointer">
+                    Publish Listing
                   </button>
                 </div>
               </form>
@@ -1108,154 +1685,90 @@ export const CollaborateTab: React.FC<CollaborateTabProps> = ({
         )}
       </AnimatePresence>
 
-      {/* ======================================================== */}
-      {/* MODAL 2: RESPOND / PITCH TO COLLABORATION REQUEST       */}
-      {/* ======================================================== */}
+      {/* MODAL 4: PITCH / APPLY TO AN OPEN REQUEST */}
       <AnimatePresence>
         {respondingToRequest && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-slate-900 border border-purple-500/30 rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl my-8"
+              className="bg-slate-900 border border-purple-500/40 rounded-2xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto space-y-4 shadow-2xl"
             >
-              {/* Header */}
-              <div className="p-5 bg-slate-950 border-b border-purple-500/20 flex items-center justify-between">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div>
-                  <span className="text-[10px] font-bold font-mono text-purple-400 uppercase tracking-wider block">
-                    Submit Proposal / Pitch
-                  </span>
-                  <h3 className="text-base font-bold text-white truncate max-w-md">
+                  <span className="text-[10px] font-mono uppercase font-bold text-purple-400">Collaborator Pitch</span>
+                  <h3 className="text-base font-bold text-white font-display mt-0.5">
                     {respondingToRequest.title}
                   </h3>
-                  <span className="text-xs text-slate-400">
-                    To: {respondingToRequest.authorArtistName} • {respondingToRequest.compensationAmount}
-                  </span>
                 </div>
-                <button
-                  onClick={() => setRespondingToRequest(null)}
-                  className="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer"
-                >
+                <button onClick={() => setRespondingToRequest(null)} className="text-slate-400 hover:text-white">
                   <X size={18} />
                 </button>
               </div>
 
-              {/* Form Body */}
-              <form onSubmit={handleSubmitResponse} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <form onSubmit={handleSubmitResponse} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      Your Name / Artist Name <span className="text-purple-400">*</span>
+                    <label className="block text-[11px] font-mono text-slate-300 font-bold mb-1">
+                      Your Name / Artist Handle: *
                     </label>
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Alex Rivera or Seattle Rhythm Co."
                       value={responderName}
                       onChange={(e) => setResponderName(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
                     />
                   </div>
-
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      Contact Email <span className="text-purple-400">*</span>
+                    <label className="block text-[11px] font-mono text-slate-300 font-bold mb-1">
+                      Email Address: *
                     </label>
                     <input
                       type="email"
                       required
-                      placeholder="alex@musician.com"
                       value={responderEmail}
                       onChange={(e) => setResponderEmail(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      Phone Number (Optional)
-                    </label>
-                    <input
-                      type="tel"
-                      placeholder="(206) 555-0199"
-                      value={responderPhone}
-                      onChange={(e) => setResponderPhone(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      Portfolio / Music Link
-                    </label>
-                    <input
-                      type="url"
-                      placeholder="https://instagram.com/..., spotify, or soundcloud"
-                      value={responderPortfolio}
-                      onChange={(e) => setResponderPortfolio(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Pitch Message */}
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-slate-300">
-                      Why You're a Great Fit (Your Pitch) <span className="text-purple-400">*</span>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={handleAiDraftPitch}
-                      disabled={isAiDraftingPitch}
-                      className="text-[11px] text-purple-300 hover:text-purple-200 font-semibold flex items-center gap-1 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 px-2 py-0.5 rounded-lg transition-all cursor-pointer"
-                    >
-                      <Sparkles size={11} className={isAiDraftingPitch ? 'animate-spin' : ''} />
-                      <span>{isAiDraftingPitch ? 'Sharon Writing...' : '✨ Let Sharon Draft Pitch'}</span>
-                    </button>
-                  </div>
-                  <textarea
-                    required
-                    rows={4}
-                    placeholder="Mention your relevant gear (e.g. in-ear monitors, click track familiarity), live experience, and rehearsal availability..."
-                    value={responderPitch}
-                    onChange={(e) => setResponderPitch(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 leading-relaxed"
-                  />
-                </div>
-
-                {/* Quoted Rate / Terms */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Confirm Rate / Availability
+                  <label className="block text-[11px] font-mono text-slate-300 font-bold mb-1">
+                    Audio / Portfolio / Reel Link:
                   </label>
                   <input
-                    type="text"
-                    placeholder={`e.g. Agreed to ${respondingToRequest.compensationAmount || '$250 flat fee'}, available for soundcheck at 5pm`}
-                    value={responderRate}
-                    onChange={(e) => setResponderRate(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                    type="url"
+                    value={responderPortfolio}
+                    onChange={(e) => setResponderPortfolio(e.target.value)}
+                    placeholder="https://instagram.com/..., spotify link, or soundcloud reel"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
                   />
                 </div>
 
-                {/* Submit Buttons */}
-                <div className="pt-4 border-t border-slate-800 flex items-center justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setRespondingToRequest(null)}
-                    className="px-4 py-2 text-xs text-slate-400 hover:text-white rounded-xl cursor-pointer"
-                  >
+                <div>
+                  <label className="block text-[11px] font-mono text-slate-300 font-bold mb-1">
+                    Your Pitch & Experience: *
+                  </label>
+                  <textarea
+                    rows={4}
+                    required
+                    value={responderPitch}
+                    onChange={(e) => setResponderPitch(e.target.value)}
+                    placeholder="Describe your gear setup, in-ear monitor experience, past shows in Seattle, and why you're a great fit..."
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-purple-500 rounded-xl p-3 text-xs text-white focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                  <button type="button" onClick={() => setRespondingToRequest(null)} className="px-4 py-2 text-xs text-slate-400 hover:text-white">
                     Cancel
                   </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-purple-600/30 flex items-center gap-1.5 transition-all cursor-pointer"
-                  >
-                    <Send size={14} />
-                    <span>Send Pitch to Band</span>
+                  <button type="submit" className="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs font-mono rounded-xl shadow-lg shadow-purple-600/30 flex items-center gap-1.5 cursor-pointer">
+                    <Send size={13} />
+                    <span>Submit Proposal</span>
                   </button>
                 </div>
               </form>
@@ -1264,136 +1777,95 @@ export const CollaborateTab: React.FC<CollaborateTabProps> = ({
         )}
       </AnimatePresence>
 
-      {/* ======================================================== */}
-      {/* MODAL 3: MANAGE RESPONSES FOR MY BAND'S POSTING          */}
-      {/* ======================================================== */}
+      {/* MODAL 5: MANAGE RESPONSES / APPLICANTS */}
       <AnimatePresence>
         {managingRequest && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-slate-900 border border-purple-500/30 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl my-8"
+              className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto space-y-4 shadow-2xl"
             >
-              {/* Header */}
-              <div className="p-5 bg-slate-950 border-b border-purple-500/20 flex items-center justify-between">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div>
-                  <span className="text-[10px] font-bold font-mono text-purple-400 uppercase tracking-wider block">
-                    Review Musician Proposals
-                  </span>
-                  <h3 className="text-base font-bold text-white truncate max-w-md">
+                  <span className="text-[10px] font-mono uppercase font-bold text-purple-400">Manage Responses</span>
+                  <h3 className="text-base font-bold text-white font-display mt-0.5">
                     {managingRequest.title}
                   </h3>
-                  <span className="text-xs text-slate-400">
-                    {managingRequest.responses?.length || 0} candidate(s) responded
+                  <span className="text-xs text-slate-400 font-mono">
+                    {managingRequest.responses?.length || 0} applicant(s)
                   </span>
                 </div>
-                <button
-                  onClick={() => setManagingRequest(null)}
-                  className="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer"
-                >
+                <button onClick={() => setManagingRequest(null)} className="text-slate-400 hover:text-white">
                   <X size={18} />
                 </button>
               </div>
 
-              {/* Responses List */}
-              <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              {/* List of responses */}
+              <div className="space-y-3">
                 {(!managingRequest.responses || managingRequest.responses.length === 0) ? (
-                  <div className="text-center py-8 space-y-2">
-                    <Users size={32} className="mx-auto text-slate-600" />
-                    <p className="text-xs text-slate-400 font-medium">No candidates have responded to this listing yet.</p>
-                    <p className="text-[11px] text-slate-500">Share your listing link or wait for local musicians to pitch!</p>
+                  <div className="p-8 text-center text-slate-500 bg-slate-950 rounded-xl border border-slate-800">
+                    <Users size={32} className="mx-auto text-slate-700 mb-2" />
+                    <p className="text-xs">No responses received yet for this listing.</p>
                   </div>
                 ) : (
                   managingRequest.responses.map(resp => (
                     <div
                       key={resp.id}
-                      className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3"
+                      className={`p-4 rounded-xl border space-y-2.5 ${
+                        resp.status === 'accepted'
+                          ? 'bg-emerald-950/30 border-emerald-500/40 text-slate-200'
+                          : 'bg-slate-950 border-slate-800 text-slate-300'
+                      }`}
                     >
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center justify-between">
                         <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-white">{resp.responderName}</span>
-                            <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase ${
-                              resp.status === 'accepted'
-                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                                : resp.status === 'shortlisted'
-                                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                                  : resp.status === 'declined'
-                                    ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                                    : 'bg-slate-800 text-slate-400'
-                            }`}>
-                              {resp.status}
-                            </span>
-                          </div>
-                          <span className="text-[11px] text-slate-400 block mt-0.5">
-                            {resp.responderEmail} {resp.responderPhone && `• ${resp.responderPhone}`}
-                          </span>
+                          <h5 className="font-bold text-white text-xs font-display">{resp.responderName}</h5>
+                          <span className="text-[10px] font-mono text-slate-400">{resp.responderEmail}</span>
                         </div>
-
-                        {resp.portfolioUrl && (
-                          <a
-                            href={resp.portfolioUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1 font-semibold bg-purple-500/10 px-2 py-1 rounded-lg border border-purple-500/20"
-                          >
-                            <span>Portfolio</span>
-                            <ExternalLink size={12} />
-                          </a>
-                        )}
+                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full uppercase font-bold ${
+                          resp.status === 'accepted'
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            : resp.status === 'shortlisted'
+                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                            : 'bg-slate-900 text-slate-400 border border-slate-800'
+                        }`}>
+                          {resp.status}
+                        </span>
                       </div>
 
-                      {/* Pitch Message */}
-                      <p className="text-xs text-slate-300 bg-slate-900/60 p-3 rounded-lg leading-relaxed border border-slate-800/80">
+                      <p className="text-xs text-slate-200 leading-relaxed bg-slate-900/60 p-2.5 rounded-lg border border-slate-850">
                         "{resp.pitchMessage}"
                       </p>
 
-                      {resp.offeredRate && (
-                        <div className="text-[11px] text-slate-400">
-                          Proposed Terms: <strong className="text-emerald-400 font-mono">{resp.offeredRate}</strong>
-                        </div>
-                      )}
-
-                      {/* Action buttons for response */}
-                      <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-900">
-                        <a
-                          href={`mailto:${resp.responderEmail}?subject=Re: ${encodeURIComponent(managingRequest.title)}`}
-                          className="text-xs text-slate-300 hover:text-white flex items-center gap-1 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 rounded-lg border border-slate-800"
+                      <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-850">
+                        <button
+                          onClick={() => {
+                            setManagingRequest(null);
+                            setActiveMessagingRequest(managingRequest);
+                          }}
+                          className="text-xs text-cyan-400 hover:underline flex items-center gap-1 font-mono"
                         >
-                          <Mail size={12} />
-                          <span>Email Musician</span>
-                        </a>
+                          <MessageSquare size={12} />
+                          <span>Open In-App Chat</span>
+                        </button>
 
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-2">
                           {resp.status !== 'accepted' && (
                             <button
                               onClick={() => {
-                                onUpdateResponseStatus(managingRequest.id, resp.id, 'accepted');
-                                setManagingRequest({
-                                  ...managingRequest,
-                                  responses: managingRequest.responses.map(r => r.id === resp.id ? { ...r, status: 'accepted' } : r)
-                                });
+                                handleAcceptCollaborationAndLink(
+                                  managingRequest,
+                                  resp.responderArtistId,
+                                  resp.responderName,
+                                  resp.id
+                                );
                               }}
-                              className="px-2.5 py-1 bg-emerald-600/30 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-all"
+                              className="px-3 py-1 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg text-xs font-mono font-bold flex items-center gap-1 shadow-sm cursor-pointer"
                             >
-                              <Check size={12} /> Accept
-                            </button>
-                          )}
-
-                          {resp.status !== 'shortlisted' && (
-                            <button
-                              onClick={() => {
-                                onUpdateResponseStatus(managingRequest.id, resp.id, 'shortlisted');
-                                setManagingRequest({
-                                  ...managingRequest,
-                                  responses: managingRequest.responses.map(r => r.id === resp.id ? { ...r, status: 'shortlisted' } : r)
-                                });
-                              }}
-                              className="px-2.5 py-1 bg-amber-600/30 hover:bg-amber-600 text-amber-300 hover:text-white border border-amber-500/40 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-all"
-                            >
-                              Shortlist
+                              <Check size={12} />
+                              <span>Accept & Link</span>
                             </button>
                           )}
 
@@ -1406,7 +1878,7 @@ export const CollaborateTab: React.FC<CollaborateTabProps> = ({
                                   responses: managingRequest.responses.map(r => r.id === resp.id ? { ...r, status: 'declined' } : r)
                                 });
                               }}
-                              className="px-2.5 py-1 bg-slate-900 hover:bg-red-950 text-slate-400 hover:text-red-300 rounded-lg text-xs font-medium cursor-pointer"
+                              className="px-2.5 py-1 bg-slate-900 hover:bg-rose-950 text-slate-400 hover:text-rose-300 rounded-lg text-xs font-mono"
                             >
                               Decline
                             </button>
@@ -1416,30 +1888,6 @@ export const CollaborateTab: React.FC<CollaborateTabProps> = ({
                     </div>
                   ))
                 )}
-
-                {/* Mark as Filled Toggle */}
-                <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
-                  <span className="text-xs text-slate-400">
-                    Status: <strong className="text-white uppercase font-mono">{managingRequest.status}</strong>
-                  </span>
-
-                  <button
-                    onClick={() => {
-                      const nextStatus = managingRequest.status === 'filled' ? 'open' : 'filled';
-                      const updated = { ...managingRequest, status: nextStatus as any };
-                      onUpdateRequest(updated);
-                      setManagingRequest(updated);
-                    }}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all ${
-                      managingRequest.status === 'filled'
-                        ? 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                        : 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                    }`}
-                  >
-                    <UserCheck size={14} />
-                    <span>{managingRequest.status === 'filled' ? 'Reopen Listing' : 'Mark Listing as Filled'}</span>
-                  </button>
-                </div>
               </div>
             </motion.div>
           </div>
@@ -1448,3 +1896,5 @@ export const CollaborateTab: React.FC<CollaborateTabProps> = ({
     </div>
   );
 };
+
+export default CollaborateTab;

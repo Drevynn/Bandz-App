@@ -355,7 +355,7 @@ export default function GigsTab({
 
   // Filter gigs by artist, status, and eventType
   const filteredGigs = gigs.filter((gig) => {
-    const matchesArtist = selectedArtistId === 'all' || gig.artistId === selectedArtistId;
+    const matchesArtist = selectedArtistId === 'all' || gig.artistId === selectedArtistId || (gig.collaboratorArtistIds && gig.collaboratorArtistIds.includes(selectedArtistId));
     const matchesStatus = filterStatus === 'all' || gig.status === filterStatus;
     const matchesType = filterEventType === 'all' || (gig.eventType || 'gig') === filterEventType;
     return matchesArtist && matchesStatus && matchesType;
@@ -752,6 +752,13 @@ export default function GigsTab({
                             <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700">
                               {gig.status}
                             </span>
+
+                            {gig.coBillArtistNames && gig.coBillArtistNames.length > 0 && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-pink-500/20 text-pink-300 border border-pink-500/30">
+                                <Users size={10} />
+                                <span>Co-bill: {gig.coBillArtistNames.join(', ')}</span>
+                              </span>
+                            )}
 
                             {/* Merch Stock Alert Badge for Gigs */}
                             {eventType === 'gig' && (

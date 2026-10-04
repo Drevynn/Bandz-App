@@ -20,7 +20,8 @@ import {
   Flame,
   Layers,
   ChevronRight,
-  TrendingUp
+  TrendingUp,
+  ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -535,6 +536,33 @@ export default function AboutTab({ onNavigateToTab }: AboutTabProps) {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* Featured Partner & Ecosystem Spotlight */}
+      <section className="bg-gradient-to-r from-amber-950/40 via-slate-900 to-purple-950/40 border border-amber-500/30 rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="space-y-1 text-center sm:text-left">
+          <div className="flex items-center justify-center sm:justify-start gap-2">
+            <span className="text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full uppercase">
+              Featured Partner
+            </span>
+          </div>
+          <h4 className="text-base font-bold text-white font-display mt-1">
+            Sovranly IP Creative & Technology Network
+          </h4>
+          <p className="text-xs text-slate-300 max-w-xl leading-relaxed">
+            Proudly connected with Sovranly IP to empower live music producers, independent artists, and digital creators with modern web ecosystems.
+          </p>
+        </div>
+
+        <a
+          href="https://sovranlyip.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-2 shadow-lg shadow-amber-500/20 cursor-pointer shrink-0"
+        >
+          <span>Visit SovranlyIP.com</span>
+          <ExternalLink size={13} />
+        </a>
       </section>
     </div>
   );

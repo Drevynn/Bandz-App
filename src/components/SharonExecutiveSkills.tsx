@@ -7,17 +7,10 @@ import {
   Copy, 
   Check, 
   FileText, 
-  Printer, 
-  Headphones, 
   Mic, 
-  Volume2, 
-  Play, 
-  Bot, 
   Sparkles, 
-  DollarSign, 
   Calendar, 
   CheckCircle2, 
-  AlertCircle,
   ExternalLink,
   Share2
 } from 'lucide-react';
@@ -246,7 +239,7 @@ Sharon (AI Band Manager for ${activeArtist.name})
           <div>
             <div className="flex items-center gap-2">
               <h4 className="font-bold text-white text-sm sm:text-base font-display">
-                Sharon's Virtual Executive Assistant Suite
+                Sharon's Executive Assistant Suite
               </h4>
               <span className="text-[10px] font-mono font-bold bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 px-2 py-0.5 rounded-full">
                 Phone & Computer Skills
@@ -368,7 +361,7 @@ Sharon (AI Band Manager for ${activeArtist.name})
                   <Mic size={13} />
                   <span>Call Notes & Voice Memo Ingestion</span>
                 </span>
-                <span className="text-[10px] font-mono text-slate-400">NLP Entity Extraction</span>
+                <span className="text-[10px] font-mono text-slate-400">NLP Extraction</span>
               </div>
 
               <textarea

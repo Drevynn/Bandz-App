@@ -26,7 +26,8 @@ import {
   Scale,
   FileText,
   Phone,
-  LifeBuoy
+  LifeBuoy,
+  ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import LegalDocsModal, { LegalDocType } from './LegalDocsModal';
@@ -905,6 +906,17 @@ export default function LandingPage({ onEnterDemo, onEnterLogin }: LandingPagePr
 
             <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 shrink-0 font-mono text-[10px] text-slate-500">
               <span>Operated by A-List Webs</span>
+              <span className="hidden sm:inline">•</span>
+              <a 
+                href="https://sovranlyip.com" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-amber-400 hover:text-amber-300 font-bold transition-colors inline-flex items-center gap-1 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded hover:bg-amber-500/20"
+                title="Visit Sovranly IP"
+              >
+                <span>sovranlyip.com</span>
+                <ExternalLink size={10} />
+              </a>
               <span className="hidden sm:inline">•</span>
               <a href="mailto:support@alistwebs.com" className="text-purple-400 hover:underline">support@alistwebs.com</a>
               <span className="hidden sm:inline">•</span>

@@ -12,7 +12,7 @@ export interface MemberCognitiveProfile {
   role: string;
   email?: string;
   phone?: string;
-  personalityArchetype: string; // e.g. "The Perfectionist Producer", "The High-Energy Performer"
+  personalityArchetype: string; // e.g. "The Perfectionist Producer", "The Master Timekeeper"
   communicationStyle: string; // e.g. "Direct bullet-points", "Needs 48hr advance schedule notice"
   stressTriggers: string[];
   musicalStrengths: string[];
@@ -44,6 +44,18 @@ export interface NotablePerformance {
   notes?: string;
 }
 
+export interface LinkedCollaborator {
+  artistId: string;
+  artistName: string;
+  genre?: string;
+  contactEmail?: string;
+  linkedSince: string;
+  collabRequestId?: string;
+  projectTitle?: string;
+  linkedGigId?: string;
+  linkedGigTitle?: string;
+}
+
 export interface Artist {
   id: string;
   name: string;
@@ -64,6 +76,7 @@ export interface Artist {
   pastPerformances?: NotablePerformance[];
   instruments?: string[];
   collaborationStatus?: 'available' | 'looking' | 'unavailable';
+  linkedCollaborators?: LinkedCollaborator[];
 }
 
 export type GigStatus = 'draft' | 'confirmed' | 'completed' | 'cancelled';
@@ -178,6 +191,8 @@ export interface Gig {
   merchChecklist?: Record<string, boolean>;
   venueData?: VenueSearchData;
   eventType?: EventType;
+  collaboratorArtistIds?: string[];
+  coBillArtistNames?: string[];
   rehearsalDetails?: RehearsalDetails;
   recordingDetails?: RecordingDetails;
   meetingDetails?: MeetingDetails;
@@ -336,6 +351,16 @@ export interface CollaborationResponse {
   createdAt: string;
 }
 
+export interface CollaborationMessage {
+  id: string;
+  requestId: string;
+  senderArtistId?: string;
+  senderName: string;
+  senderRole: 'author' | 'collaborator' | 'system';
+  messageText: string;
+  timestamp: string;
+}
+
 export interface CollaborationRequest {
   id: string;
   userId?: string;
@@ -343,7 +368,11 @@ export interface CollaborationRequest {
   authorArtistName: string;
   authorContactEmail: string;
   authorGenre?: string;
-  title: string; // e.g. "Drummer needed for RINO Room gig", "Graphic designer for tour poster"
+  targetArtistId?: string; // If sent directly to a specific band/artist
+  targetArtistName?: string;
+  isDirectArtistCollab?: boolean; // Direct proposal from Band A to Band B
+  collabType?: 'co_bill_show' | 'tour_support' | 'split_single' | 'guest_musician' | 'hired_specialist';
+  title: string; // e.g. "Co-bill with Maya Linn at The Crocodile", "Drummer needed for RINO Room gig"
   roleNeeded: CollaboratorRole;
   customRoleName?: string;
   skillsRequired: string[]; // e.g. ['In-ear monitors', 'Rock', 'Double kick pedal']
@@ -357,7 +386,10 @@ export interface CollaborationRequest {
   compensationType: CollaborationCompensationType;
   compensationAmount?: string; // e.g. "$250 flat fee", "20% door cut", "Volunteer"
   status: 'open' | 'in_discussion' | 'filled' | 'closed';
+  acceptedCollaboratorId?: string;
+  acceptedCollaboratorName?: string;
   responses: CollaborationResponse[];
+  messages?: CollaborationMessage[];
   createdAt: string;
 }
 
@@ -377,14 +409,14 @@ export interface DeepResearchResult {
   sources: DeepResearchSource[];
 }
 
-export interface MediaPipeGestureState {
+export interface StageGestureState {
   categoryName: string;
   score: number;
   label: string;
   actionDetected?: string;
 }
 
-export interface MediaPipeRehearsalMetrics {
+export interface StageRehearsalMetrics {
   stageEnergyScore: number; // 0 - 100
   focusScore: number; // 0 - 100
   headMotionPacing: string;

@@ -219,11 +219,46 @@ app.post('/api/sharon-action', async (req, res) => {
       };
     }
 
-    // 6. Default conversational reply from Sharon
+    // 6. Check for dictated tour notes / road notes / load-in logistics
+    if (lower.includes('tour note') || lower.includes('road note') || lower.includes('venue note') || lower.includes('note for') || lower.includes('load-in') || lower.includes('soundcheck note')) {
+      const venueMatch = text.match(/(?:for|at)\s+([A-Za-z0-9\s'&.-]+?)(?::|\s+-|\s+load|\s+sound|\s+stage|\s+parking|$)/i);
+      const targetVenueOrCity = venueMatch ? venueMatch[1].trim() : 'Upcoming Tour Date';
+      return {
+        action: 'update_tour_note',
+        data: {
+          targetVenueOrCity,
+          noteText: cleanMsg,
+          category: lower.includes('sound') ? 'soundcheck' : (lower.includes('hotel') ? 'lodging' : 'logistics')
+        },
+        reply: `Dictation recorded! I am Sharon, your AI Band Manager. I've logged your tour note for "${targetVenueOrCity}" directly into your tour dispatch logs & gig notes.`
+      };
+    }
+
+    // 7. Check for dictated setlist changes / song adjustments
+    if (lower.includes('setlist change') || lower.includes('setlist update') || lower.includes('setlist note') || lower.includes('encore') || lower.includes('change tempo') || lower.includes('change key') || lower.includes('swap track') || lower.includes('song order')) {
+      const bpmMatch = text.match(/(\d{2,3})\s*bpm/i);
+      const keyMatch = text.match(/\bkey of\s+([A-Ga-g][#b]?(?:\s*(?:minor|major|m))?)/i);
+      const songMatch = text.match(/(?:track|song|move)\s+['"]?([^'"]+?)['"]?(?:\s+to|\s+at|\s+in|\s+as|$)/i);
+      const songTitle = songMatch ? songMatch[1].trim() : 'Setlist Track';
+
+      return {
+        action: 'update_setlist_change',
+        data: {
+          songTitle,
+          bpm: bpmMatch ? parseInt(bpmMatch[1], 10) : undefined,
+          key: keyMatch ? keyMatch[1].trim() : undefined,
+          changeDescription: cleanMsg,
+          isEncore: lower.includes('encore')
+        },
+        reply: `Setlist change recorded! I am Sharon, your AI Band Manager. I've updated the setlist arrangement and track dynamics for "${songTitle}" in your Setlist Builder.`
+      };
+    }
+
+    // 8. Default conversational reply from Sharon
     return {
       action: 'chat',
       data: {},
-      reply: `Hi! I'm Sharon, your AI Band Manager. You can tell me to manage your band anytime — like "Sharon add the RINO room gig Dec 1 2026", "Sharon schedule rehearsal this Thursday", "Sharon find a drummer for our gig", or "Sharon log $200 expense for merch". What should we tackle next for ${artistName}?`
+      reply: `Hi! I'm Sharon, your AI Band Manager. You can dictate anything directly to me using the microphone — like "Sharon add tour note for Crocodile: load-in at 5:30pm", "Sharon setlist change: move track 3 to encore in key of E Minor", or "Sharon log $200 expense for merch". What should we tackle next for ${artistName}?`
     };
   };
 
@@ -286,11 +321,25 @@ app.post('/api/sharon-action', async (req, res) => {
          - location: string
          - isRemote: boolean
 
-      6. "chat": General advice, question about music promotion, or when no specific entity is added.
+      6. "update_tour_note": Dictating road notes, tour logistics, venue load-in times, green room access, soundcheck requests, or hotel details.
+         Extract:
+         - targetVenueOrCity: string
+         - noteText: string
+         - category: "logistics" | "soundcheck" | "hospitality" | "lodging" | "general"
+
+      7. "update_setlist_change": Dictating setlist re-orderings, key/tempo adjustments, encore designations, acoustic variations, or track timings.
+         Extract:
+         - songTitle: string
+         - bpm: number | undefined
+         - key: string | undefined
+         - position: "opener" | "mid_set" | "closer" | "encore" | string | undefined
+         - changeDescription: string
+
+      8. "chat": General advice, question about music promotion, or when no specific entity is added.
 
       Respond ONLY with a valid JSON block inside \`\`\`json ... \`\`\` adhering to:
       {
-        "action": "add_gig" | "add_song" | "add_budget" | "add_member" | "add_collaboration" | "chat",
+        "action": "add_gig" | "add_song" | "add_budget" | "add_member" | "add_collaboration" | "update_tour_note" | "update_setlist_change" | "chat",
         "data": { ...extracted fields matching the action... },
         "reply": "Warm, professional, confident response speaking as Sharon (the AI Band Manager), addressing what you did or answering their question."
       }
@@ -321,258 +370,6 @@ app.post('/api/sharon-action', async (req, res) => {
     console.error('Gemini Sharon-action error:', error);
     const fallbackResult = fallbackParse(cleanMsg);
     return res.json(fallbackResult);
-  }
-});
-
-// ==========================================
-// SHARON DEEP RESEARCH ENGINE (GOOGLE SEARCH GROUNDING)
-// ==========================================
-app.post('/api/sharon-deep-research', async (req, res) => {
-  const { query, category = 'venue_booking', artistName = 'the band', location = 'Seattle, WA' } = req.body;
-
-  if (!query || typeof query !== 'string') {
-    return res.status(400).json({ error: 'Search research query is required.' });
-  }
-
-  const cleanQuery = query.trim();
-
-  // Deterministic high-value research fallback for offline/demo mode
-  const getFallbackDossier = () => {
-    return {
-      id: `research-${Date.now()}`,
-      topic: cleanQuery,
-      category,
-      timestamp: new Date().toISOString(),
-      summary: `Sharon's Deep Research Investigation into "${cleanQuery}" for ${artistName} in ${location}.`,
-      keyFindings: [
-        `Booking lead times for independent venues in ${location} average 8 to 12 weeks in advance.`,
-        `Talent buyers prioritize bands with verified local draw (50-150 ticket track record) and high-quality stage plots.`,
-        `Door-split benchmarks for mid-tier rooms typically offer 70/30 or 80/20 after production expenses.`,
-        `Peak engagement days for tour stops in the region are Thursdays through Saturdays, with college towns favoring Wednesdays.`
-      ],
-      executiveActionPlan: [
-        `Send personalized pitch emails directly to head talent buyers on Tuesday mornings with Spotify and live video links.`,
-        `Include your technical stage plot and channel input list upfront to streamline sound engineer approval.`,
-        `Co-bill with a complementary local act in ${location} to guarantee minimum door split thresholds.`,
-        `Add show details to Bandsintown, Songkick, and local alt-weekly event calendars 6 weeks prior.`
-      ],
-      sources: [
-        { title: `${location} Independent Music Venue Guide`, url: 'https://www.seattle.gov/filmandmusic' },
-        { title: 'Indie On The Move Touring & Booking Directory', url: 'https://www.indieonthemove.com' },
-        { title: 'Sound Exchange & Venue Specs Database', url: 'https://www.soundexchange.com' }
-      ]
-    };
-  };
-
-  if (!ai) {
-    return res.json(getFallbackDossier());
-  }
-
-  try {
-    const researchPrompt = `
-      You are Sharon, an elite, highly experienced AI Band Manager conducting Deep Web Research for your band: "${artistName}" (Base location: ${location}).
-      The band has tasked you with this research topic: "${cleanQuery}".
-      Category: ${category}.
-
-      Use your Google Search grounding to uncover real, up-to-date, actionable industry facts, real venues, real booking practices, ticket norms, festival application windows, or gear specs.
-
-      Format your response strictly as a JSON object inside \`\`\`json ... \`\`\` with this exact schema:
-      {
-        "summary": "2-3 concise paragraphs summarizing the research findings with a sharp, professional band manager perspective.",
-        "keyFindings": [
-          "Specific fact, venue spec, rate, or trend with exact numbers/names",
-          "Another concrete verified finding",
-          "Another concrete verified finding",
-          "Another concrete verified finding"
-        ],
-        "executiveActionPlan": [
-          "Immediate managerial action step 1 for the band",
-          "Step 2",
-          "Step 3",
-          "Step 4"
-        ]
-      }
-    `;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents: researchPrompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-      },
-    });
-
-    const text = response.text || '';
-    let parsed: any = null;
-
-    const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
-    if (jsonMatch && jsonMatch[1]) {
-      try {
-        parsed = JSON.parse(jsonMatch[1]);
-      } catch (e) {
-        console.warn('JSON parse error from search grounded output', e);
-      }
-    } else {
-      try {
-        parsed = JSON.parse(text);
-      } catch (e) {
-        // fallback to structured text extraction
-      }
-    }
-
-    // Extract real grounding chunks from Google Search
-    const groundingChunks = (response.candidates?.[0]?.groundingMetadata as any)?.groundingChunks;
-    const sources: Array<{ title: string; url: string }> = [];
-
-    if (Array.isArray(groundingChunks)) {
-      groundingChunks.forEach((chunk: any) => {
-        if (chunk.web?.uri) {
-          sources.push({
-            title: chunk.web.title || new URL(chunk.web.uri).hostname,
-            url: chunk.web.uri
-          });
-        }
-      });
-    }
-
-    if (sources.length === 0) {
-      sources.push(
-        { title: 'Google Grounded Search Intelligence', url: 'https://google.com' },
-        { title: 'Indie Touring & Booking Intelligence Network', url: 'https://indieonthemove.com' }
-      );
-    }
-
-    const result = {
-      id: `research-${Date.now()}`,
-      topic: cleanQuery,
-      category,
-      timestamp: new Date().toISOString(),
-      summary: parsed?.summary || text.slice(0, 500) || `Research completed for ${cleanQuery}.`,
-      keyFindings: Array.isArray(parsed?.keyFindings) && parsed.keyFindings.length > 0
-        ? parsed.keyFindings
-        : [
-            `Verified local market benchmarks for ${artistName} in ${location}.`,
-            `Direct booking windows and promoter contact guidelines analyzed.`,
-            `Strategic positioning recommendations synthesized by Sharon.`
-          ],
-      executiveActionPlan: Array.isArray(parsed?.executiveActionPlan) && parsed.executiveActionPlan.length > 0
-        ? parsed.executiveActionPlan
-        : [
-            `Incorporate findings into upcoming tour and release schedule.`,
-            `Update tech rider and booking pitch email based on room requirements.`
-          ],
-      sources: sources.slice(0, 6)
-    };
-
-    return res.json(result);
-  } catch (error: any) {
-    console.error('Deep Research error:', error);
-    return res.json(getFallbackDossier());
-  }
-});
-
-// ==========================================
-// SHARON VOICE TALK-BACK (TTS GENERATION)
-// ==========================================
-app.post('/api/sharon-voice', async (req, res) => {
-  const { text } = req.body;
-  if (!text || typeof text !== 'string') {
-    return res.status(400).json({ error: 'Text is required for Sharon voice.' });
-  }
-
-  if (!ai) {
-    return res.json({ clientSpeechFallback: true });
-  }
-
-  try {
-    const cleanText = text.trim().slice(0, 450);
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash-lite-tts',
-      contents: cleanText,
-      config: {
-        responseModalities: ['AUDIO'],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Kore' },
-          },
-        },
-      },
-    });
-
-    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (base64Audio) {
-      return res.json({ audio: base64Audio, mimeType: 'audio/pcm;rate=24000' });
-    }
-    return res.json({ clientSpeechFallback: true });
-  } catch (err: any) {
-    console.warn('TTS error (falling back to client voice):', err?.message);
-    return res.json({ clientSpeechFallback: true });
-  }
-});
-
-// ==========================================
-// SHARON MEMBER COGNITIVE INSIGHT & ADVICE
-// ==========================================
-app.post('/api/sharon-member-insight', async (req, res) => {
-  const { member, artistName = 'the band', promptType = 'general_coaching' } = req.body;
-
-  if (!member || !member.name) {
-    return res.status(400).json({ error: 'Member profile is required.' });
-  }
-
-  const memberName = member.name;
-  const role = member.role || 'Musician';
-  const archetype = member.cognitiveProfile?.personalityArchetype || 'Dedicated Performer';
-  const triggers = member.cognitiveProfile?.stressTriggers?.join(', ') || 'rehearsal delays, sound issues';
-  const habits = member.cognitiveProfile?.rehearsalHabits || 'Prepares parts at home';
-  const memories = (member.cognitiveProfile?.memories || []).slice(0, 5).map((m: any) => `[${m.timestamp?.slice(0, 10)}] ${m.note}`).join('\n');
-
-  if (!ai) {
-    return res.json({
-      insight: `Sharon's Managerial Assessment for ${memberName} (${role}): As ${archetype}, ${memberName} thrives when communication is clear and expectations are defined well in advance. Keep monitor levels tested during soundcheck to mitigate known stress points (${triggers}).`,
-      recommendedAction: `Schedule a 5-minute pre-show check-in and confirm their monitor mix channel is locked before downbeat.`,
-      communicationTip: `Keep instructions concise, validate their musical contributions, and provide schedule changes with at least 24 hours notice.`
-    });
-  }
-
-  try {
-    const prompt = `
-      You are Sharon, the experienced AI Band Manager for "${artistName}".
-      You are reviewing your cognitive memory and long-term notes for band member: "${memberName}" (${role}).
-      
-      Member Personality Archetype: "${archetype}"
-      Known Stress Triggers: "${triggers}"
-      Rehearsal Habits: "${habits}"
-      Past Observations Recorded by you:
-      ${memories || 'No past incidents logged yet.'}
-
-      Provide your managerial coaching assessment for managing ${memberName} over time.
-      Output ONLY valid JSON inside \`\`\`json ... \`\`\` with:
-      {
-        "insight": "Sharon's deep psychological and managerial read on this member's current vibe, strengths, and dynamics within the band.",
-        "recommendedAction": "Actionable managerial step for rehearsal, gig, or conversation.",
-        "communicationTip": "Specific guideline on how the band leader or manager should speak with them to get their best performance."
-      }
-    `;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents: prompt,
-    });
-
-    const text = response.text || '';
-    const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
-    if (jsonMatch && jsonMatch[1]) {
-      return res.json(JSON.parse(jsonMatch[1]));
-    }
-    return res.json(JSON.parse(text));
-  } catch (error: any) {
-    console.error('Sharon member insight error:', error);
-    return res.json({
-      insight: `Sharon's Managerial Assessment for ${memberName} (${role}): Thrives with steady pacing and solid technical prep. Monitor levels and tempo stability remain top priorities.`,
-      recommendedAction: `Run 2-song soundcheck focusing on their direct audio mix.`,
-      communicationTip: `Direct, supportive tone with clear timing cues.`
-    });
   }
 });
 
