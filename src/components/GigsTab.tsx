@@ -51,6 +51,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import CalendarView, { EVENT_TYPE_CONFIG } from './CalendarView';
 import VenueSearchModal from './VenueSearchModal';
+import MapView from './MapView';
 
 interface GigsTabProps {
   gigs: Gig[];
@@ -87,7 +88,7 @@ export default function GigsTab({
 }: GigsTabProps) {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterEventType, setFilterEventType] = useState<'all' | EventType>('all');
-  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'calendar' | 'map'>('list');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedGig, setSelectedGig] = useState<Gig | null>(gigs[0] || null);
@@ -570,9 +571,29 @@ export default function GigsTab({
   const countMeetings = gigs.filter(g => (selectedArtistId === 'all' || g.artistId === selectedArtistId) && g.eventType === 'meeting').length;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8" id="gigs-tab-root">
-      {/* Sidebar - Gig List */}
-      <div className="lg:col-span-5 flex flex-col gap-6">
+    <div id="gigs-tab-root" className="space-y-6">
+      {viewMode === 'map' ? (
+        <MapView
+          gigs={filteredGigs}
+          artists={artists}
+          selectedArtistId={selectedArtistId}
+          selectedGig={selectedGig}
+          onSelectGig={(gig) => {
+            setSelectedGig(gig);
+          }}
+          onQuickAddDate={(dt) => {
+            setFormDateTime(dt);
+            setShowAddModal(true);
+          }}
+          onNavigateToTab={onNavigateToTab}
+          viewMode="map"
+          onViewModeChange={(mode) => setViewMode(mode)}
+          onScheduleGig={() => setShowAddModal(true)}
+        />
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* Sidebar - Gig List */}
+          <div className="lg:col-span-5 flex flex-col gap-6">
         <div className="bg-slate-900/60 backdrop-blur-md border border-purple-500/10 rounded-2xl p-5 flex flex-col gap-4 shadow-lg shadow-black/20">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -586,16 +607,26 @@ export default function GigsTab({
             {/* View Mode Toggle */}
             <div className="flex bg-slate-950 rounded-xl border border-slate-800 p-1">
               <button
+                type="button"
                 onClick={() => setViewMode('list')}
                 className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${viewMode === 'list' ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/30' : 'text-slate-400 hover:text-slate-200'}`}
               >
                 List
               </button>
               <button
+                type="button"
                 onClick={() => setViewMode('calendar')}
                 className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${viewMode === 'calendar' ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/30' : 'text-slate-400 hover:text-slate-200'}`}
               >
                 Calendar
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('map')}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${viewMode === 'map' ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/30' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                <MapPin size={11} />
+                <span>Map</span>
               </button>
             </div>
           </div>
@@ -1473,18 +1504,30 @@ export default function GigsTab({
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => handleOpenVenueSearch('detail', selectedGig.venueName)}
-                        className="inline-flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg bg-purple-950/40 hover:bg-purple-900/60 border border-purple-500/30 text-purple-300 hover:text-purple-200 text-xs font-semibold transition-all cursor-pointer shadow-sm w-full"
-                        title="Search venue contact information, capacity, and backline specs with Google AI"
-                      >
-                        <span className="flex items-center gap-1.5">
-                          <Sparkles size={13} className="text-purple-400" />
-                          <span>Google Grounded Venue Specs</span>
-                        </span>
-                        <Globe size={13} className="text-blue-400" />
-                      </button>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setViewMode('map')}
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-purple-500/30 text-purple-300 hover:text-purple-200 text-xs font-semibold transition-all cursor-pointer shadow-sm flex-1"
+                          title="View this gig venue and route on the interactive MapView"
+                        >
+                          <MapPin size={13} className="text-purple-400" />
+                          <span>View on Map</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleOpenVenueSearch('detail', selectedGig.venueName)}
+                          className="inline-flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-lg bg-purple-950/40 hover:bg-purple-900/60 border border-purple-500/30 text-purple-300 hover:text-purple-200 text-xs font-semibold transition-all cursor-pointer shadow-sm flex-1"
+                          title="Search venue contact information, capacity, and backline specs with Google AI"
+                        >
+                          <span className="flex items-center gap-1.5 truncate">
+                            <Sparkles size={13} className="text-purple-400 shrink-0" />
+                            <span className="truncate">AI Venue Specs</span>
+                          </span>
+                          <Globe size={13} className="text-blue-400 shrink-0" />
+                        </button>
+                      </div>
                     </div>
 
                     <div className="bg-slate-950/40 border border-slate-800/50 rounded-xl p-4 flex gap-3 items-start">
@@ -1683,6 +1726,8 @@ export default function GigsTab({
           )}
         </AnimatePresence>
       </div>
+    </div>
+  )}
 
       {/* Add Gig Modal */}
       {showAddModal && (

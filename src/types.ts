@@ -89,6 +89,11 @@ export interface GigPromoChecklist {
   ticketsLive: boolean;
 }
 
+export interface Coordinates {
+  lat: number;
+  lng: number;
+}
+
 export interface VenueTechEquipment {
   paSoundSystem?: string;
   lighting?: string;
@@ -110,6 +115,7 @@ export interface Venue {
   techEquipment?: VenueTechEquipment;
   notes?: string;
   website?: string;
+  coordinates?: Coordinates;
 }
 
 export interface GroundingSource {
@@ -121,6 +127,7 @@ export interface VenueSearchData {
   venueName: string;
   address?: string;
   capacity?: string;
+  coordinates?: Coordinates;
   contactInfo?: {
     email?: string;
     phone?: string;
@@ -190,6 +197,7 @@ export interface Gig {
   merchStockNotes?: string;
   merchChecklist?: Record<string, boolean>;
   venueData?: VenueSearchData;
+  coordinates?: Coordinates;
   eventType?: EventType;
   collaboratorArtistIds?: string[];
   coBillArtistNames?: string[];
